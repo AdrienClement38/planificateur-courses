@@ -7,17 +7,49 @@ import { MealPlanGrid } from "@/components/meal-plan/MealPlanGrid";
 import { ShoppingList } from "@/components/shopping/ShoppingList";
 import { DRIVES } from "@/lib/drives";
 import type { MealPlan, DriveKey } from "@/types";
-import { ArrowLeft, ExternalLink, SearchCheck } from "lucide-react";
+import { ArrowLeft, ExternalLink, SearchCheck, Loader2, CheckCircle2 } from "lucide-react";
+import { useEffect, useMemo } from "react";
+import { usePricing } from "@/hooks/usePricing";
+import { Progress } from "@/components/ui/progress";
 
 interface PlanResultsProps {
   plan: MealPlan;
   budget: number;
   driveKey: DriveKey;
+  storeUrl?: string;
   onReset: () => void;
 }
 
-export function PlanResults({ plan, budget, driveKey, onReset }: PlanResultsProps) {
+export function PlanResults({ plan, budget, driveKey, storeUrl, onReset }: PlanResultsProps) {
   const drive = DRIVES[driveKey];
+  const { pricingStatus, pricedCount, resolvedItems, startPricing } = usePricing();
+
+  // Extract all item names from shopping list for pricing
+  const allItems = useMemo(() => {
+    return plan.shopping_list.flatMap(cat => cat.items.map(item => item.name));
+  }, [plan]);
+
+  useEffect(() => {
+    if (allItems.length > 0 && pricingStatus === "idle") {
+      startPricing(allItems, driveKey, "echirolles-comboire");
+    }
+  }, [allItems, driveKey, startPricing, pricingStatus]);
+
+  // Calculate real total based on resolved prices + estimated for remaining
+  const dynamicTotal = useMemo(() => {
+    let total = 0;
+    plan.shopping_list.forEach(cat => {
+      cat.items.forEach(item => {
+        const resolved = resolvedItems.get(item.name);
+        if (resolved && resolved.price !== null) {
+          total += resolved.price;
+        } else {
+          total += item.total_price; // Fallback to AI estimate
+        }
+      });
+    });
+    return total;
+  }, [plan, resolvedItems]);
 
   return (
     <div className="space-y-6">
@@ -45,7 +77,29 @@ export function PlanResults({ plan, budget, driveKey, onReset }: PlanResultsProp
       )}
 
       {/* Budget */}
-      <BudgetBar estimated={plan.estimated_total} budget={budget} />
+      <div className="space-y-4">
+        {pricingStatus === "loading" && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs font-medium">
+              <div className="flex items-center gap-2 text-primary">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Vérification des prix réels...
+              </div>
+              <span className="text-muted-foreground">{pricedCount} / {allItems.length}</span>
+            </div>
+            <Progress value={(pricedCount / allItems.length) * 100} className="h-1.5" />
+          </div>
+        )}
+        
+        {pricingStatus === "done" && (
+          <div className="flex items-center gap-2 text-xs font-medium text-green-500 bg-green-500/5 py-2 px-3 rounded-md border border-green-500/20">
+            <CheckCircle2 className="h-4 w-4" />
+            Prix réels vérifiés en base de données.
+          </div>
+        )}
+
+        <BudgetBar estimated={dynamicTotal} budget={budget} />
+      </div>
 
       {/* Tabs */}
       <Tabs defaultValue="meals">
@@ -66,7 +120,12 @@ export function PlanResults({ plan, budget, driveKey, onReset }: PlanResultsProp
         </TabsContent>
 
         <TabsContent value="shopping" className="mt-6">
-          <ShoppingList shoppingList={plan.shopping_list} driveKey={driveKey} />
+          <ShoppingList 
+            shoppingList={plan.shopping_list} 
+            driveKey={driveKey} 
+            resolvedItems={resolvedItems} 
+            storeUrl={storeUrl}
+          />
         </TabsContent>
         
         <TabsContent value="research" className="mt-6">

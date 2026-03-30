@@ -98,6 +98,7 @@ export default function Home() {
             plan={plan}
             budget={lastFormData.budget}
             driveKey={lastFormData.drive}
+            storeUrl={lastFormData.selectedStoreUrl}
             onReset={reset}
           />
         )}

@@ -1,0 +1,34 @@
+name: Update Drive Prices
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Chaque dimanche à minuit
+  workflow_dispatch: # Permet de lancer manuellement
+
+jobs:
+  update-prices:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - run: npm install
+      
+      - name: Run price update script
+        run: npx tsx scripts/update-prices.ts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          
+      - name: Commit and push if database changed (SQLite only)
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          if [ -f "dev.db" ]; then
+            git add dev.db
+            git commit -m "chore: mise à jour des prix drive [skip ci]" || echo "No changes to commit"
+            git push
+          fi

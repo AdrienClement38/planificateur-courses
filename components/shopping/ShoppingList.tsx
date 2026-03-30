@@ -4,13 +4,17 @@ import { ExternalLink, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DRIVES } from "@/lib/drives";
 import type { ShoppingList as ShoppingListType, DriveKey } from "@/types";
+import type { PricingResult } from "@/hooks/usePricing";
+import { Badge } from "@/components/ui/badge";
 
 interface ShoppingListProps {
   shoppingList: ShoppingListType;
   driveKey: DriveKey;
+  resolvedItems?: Map<string, PricingResult>;
+  storeUrl?: string;
 }
 
-export function ShoppingList({ shoppingList, driveKey }: ShoppingListProps) {
+export function ShoppingList({ shoppingList, driveKey, resolvedItems, storeUrl }: ShoppingListProps) {
   const drive = DRIVES[driveKey];
 
   const handleExport = () => {
@@ -22,7 +26,11 @@ export function ShoppingList({ shoppingList, driveKey }: ShoppingListProps) {
       if (!items?.length) continue;
       text += `\n== ${category} ==\n`;
       for (const item of items) {
-        text += `• ${item.name} — ${item.qty} — ${item.total_price.toFixed(2)}€\n`;
+        const resolved = resolvedItems?.get(item.name);
+        const price = resolved?.price ?? item.total_price;
+        const source = resolved?.source === "db" ? "(Réel)" : "(Est.)";
+        const url = drive.buildSearchUrl(item.name, storeUrl);
+        text += `• ${item.name} — ${item.qty} — ${price.toFixed(2)}€ ${source} — ${url}\n`;
       }
     }
 
@@ -54,29 +62,57 @@ export function ShoppingList({ shoppingList, driveKey }: ShoppingListProps) {
               {category}
             </p>
             <div className="divide-y">
-              {items.map((item, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-2 py-2 text-sm"
-                >
-                  <span className="flex-1 font-medium">{item.name}</span>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {item.qty}
-                  </span>
-                  <span className="w-14 text-right font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums whitespace-nowrap">
-                    {item.total_price.toFixed(2)}€
-                  </span>
-                  <a
-                    href={item.link || drive.buildSearchUrl(item.name)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="shrink-0 rounded-md border p-1 text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-                    title={`Chercher sur ${drive.name}`}
+              {items.map((item, i) => {
+                const resolved = resolvedItems?.get(item.name);
+                const isReal = resolved?.source === "db";
+                const displayPrice = resolved?.price ?? item.total_price;
+
+                return (
+                  <div
+                    key={i}
+                    className="group flex items-center gap-3 py-2 text-sm"
                   >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                </div>
-              ))}
+                    <div className="flex flex-1 flex-col min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium truncate">{item.name}</span>
+                        {isReal ? (
+                          <Badge variant="outline" className="h-4 px-1.5 text-[9px] font-black uppercase tracking-tighter bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
+                            Réel
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="h-4 px-1.5 text-[9px] font-black uppercase tracking-tighter bg-orange-500/10 text-orange-500 border-orange-500/20">
+                            Est.
+                          </Badge>
+                        )}
+                      </div>
+                      {resolved?.matched && (
+                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground italic truncate">
+                          <span className="shrink-0 opacity-50">Match:</span>
+                          <span className="truncate">{resolved.matched}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {item.qty}
+                    </span>
+
+                    <span className="w-16 text-right font-bold text-foreground tabular-nums whitespace-nowrap">
+                      {displayPrice.toFixed(2)}€
+                    </span>
+
+                    <a
+                      href={item.link || drive.buildSearchUrl(item.name, storeUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 rounded-md border border-white/5 bg-white/[0.03] p-1.5 text-muted-foreground transition-all hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
+                      title={`Voir sur ${drive.name}`}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ))}

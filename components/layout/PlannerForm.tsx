@@ -17,6 +17,19 @@ import { TagInput } from "@/components/drive/TagInput";
 import type { DriveKey, MealType, Period, PlannerFormData } from "@/types";
 import { Loader2, Sparkles, CheckCircle2 } from "lucide-react";
 
+const MEAL_TYPE_LABELS: Record<MealType, string> = {
+  dinner: "Dîners uniquement",
+  "lunch-dinner": "Midi + soir",
+  all: "Petit-déj + midi + soir",
+};
+
+const PERIOD_LABELS: Record<Period, string> = {
+  "1 week": "1 semaine",
+  "2 weeks": "2 semaines",
+  "3 weeks": "3 semaines",
+  "1 month": "1 mois",
+};
+
 interface PlannerFormProps {
   onSubmit: (data: PlannerFormData) => void;
   isLoading: boolean;
@@ -186,12 +199,12 @@ export function PlannerForm({ onSubmit, isLoading }: PlannerFormProps) {
               onValueChange={(v) => setMealType(v as MealType)}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue>{MEAL_TYPE_LABELS[mealType]}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="dinner">Dîners uniquement</SelectItem>
-                <SelectItem value="lunch-dinner">Midi + soir</SelectItem>
-                <SelectItem value="all">Petit-déj + midi + soir</SelectItem>
+                {(Object.entries(MEAL_TYPE_LABELS) as [MealType, string][]).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -203,13 +216,12 @@ export function PlannerForm({ onSubmit, isLoading }: PlannerFormProps) {
               onValueChange={(v) => setPeriod(v as Period)}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue>{PERIOD_LABELS[period]}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="1 week">1 semaine</SelectItem>
-                <SelectItem value="2 weeks">2 semaines</SelectItem>
-                <SelectItem value="3 weeks">3 semaines</SelectItem>
-                <SelectItem value="1 month">1 mois</SelectItem>
+                {(Object.entries(PERIOD_LABELS) as [Period, string][]).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

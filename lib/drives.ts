@@ -7,8 +7,13 @@ export const DRIVES: Record<DriveKey, DriveConfig> = {
     label: "Leclerc",
     home: "https://www.leclercdrive.fr",
     color: "#003189",
-    buildSearchUrl: (q) =>
-      `https://www.leclercdrive.fr/recherche/?q=${encodeURIComponent(q)}`,
+    buildSearchUrl: (q, baseUrl) => {
+      if (baseUrl && baseUrl.includes("leclercdrive.fr")) {
+        // Transform https://.../magasin-XXXX.aspx to https://.../magasin-XXXX/recherche.aspx?TexteRecherche=...
+        return baseUrl.replace(".aspx", "") + `/recherche.aspx?TexteRecherche=${encodeURIComponent(q)}`;
+      }
+      return `https://www.leclercdrive.fr/recherche/?q=${encodeURIComponent(q)}`;
+    },
   },
   carrefour: {
     key: "carrefour",

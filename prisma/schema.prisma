@@ -1,0 +1,26 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Product {
+  id           Int      @id @default(autoincrement())
+  name         String                        // Nom normalisé (ex: "filet de poulet")
+  brand        String?                       // Marque (ex: "Le Gaulois")
+  drive        String                        // "leclerc" | "carrefour" | etc.
+  store_id     String?                       // Identifiant magasin (ex: "echirolles-comboire")
+  price_ttc    Float                         // Prix TTC unitaire
+  unit         String?                       // "kg", "pièce", "L", "paquet"
+  quantity     String?                       // "720g", "2kg", "x6"
+  category     String                        // Catégorie (ex: "Viandes & Poissons")
+  search_url   String?                       // URL de recherche sur le drive
+  last_updated DateTime @default(now())
+  source       String   @default("manual")   // "manual" | "scrape" | "invoice"
+
+  @@unique([name, drive, store_id])
+  @@index([name, drive])
+}

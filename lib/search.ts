@@ -12,8 +12,8 @@ export async function searchPrices(query: string, driveName: string, driveDomain
     },
     body: JSON.stringify({
       q: driveDomain 
-        ? `site:${driveDomain} "${query}" ${location || ""}` 
-        : `site:auchan.fr OR site:leclerc.fr OR site:carrefour.fr OR site:intermarche.fr "${query}" prix drive ${location || ""}`,
+        ? `site:${driveDomain} ${query} ${location || ""}` 
+        : `site:auchan.fr OR site:leclerc.fr OR site:carrefour.fr OR site:intermarche.fr ${query} prix drive ${location || ""}`,
       gl: "fr",
       hl: "fr",
       num: 5,
