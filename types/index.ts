@@ -10,7 +10,7 @@ export interface DriveConfig {
 }
 
 export type MealType = "dinner" | "lunch-dinner" | "all";
-export type Period = "1 week" | "2 weeks" | "1 month";
+export type Period = "1 week" | "2 weeks" | "3 weeks" | "1 month";
 
 export interface PlannerFormData {
   budget: number;
@@ -18,6 +18,9 @@ export interface PlannerFormData {
   mealType: MealType;
   period: Period;
   drive: DriveKey;
+  zipCode: string;
+  selectedStore?: string;
+  selectedStoreUrl?: string;
   preferences: string[];
   exclusions: string[];
   cuisineStyle: string;
@@ -34,15 +37,22 @@ export interface ShoppingItem {
   qty: string;
   unit_price: number;
   total_price: number;
+  link?: string;
 }
 
-export type ShoppingList = Record<string, ShoppingItem[]>;
+export interface ShoppingCategory {
+  category: string;
+  items: ShoppingItem[];
+}
+
+export type ShoppingList = ShoppingCategory[];
 
 export interface MealPlan {
   summary: string;
   estimated_total: number;
   meals: Meal[];
   shopping_list: ShoppingList;
+  research_audit?: string[];
 }
 
 export interface GenerateRequest {

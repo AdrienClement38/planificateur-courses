@@ -5,6 +5,7 @@ export const ShoppingItemSchema = z.object({
   qty: z.string(),
   unit_price: z.number(),
   total_price: z.number(),
+  link: z.string().optional(),
 });
 
 export const MealSchema = z.object({
@@ -13,19 +14,28 @@ export const MealSchema = z.object({
   tags: z.array(z.string()).default([]),
 });
 
+export const ShoppingCategorySchema = z.object({
+  category: z.string(),
+  items: z.array(ShoppingItemSchema),
+});
+
 export const MealPlanSchema = z.object({
   summary: z.string(),
   estimated_total: z.number(),
   meals: z.array(MealSchema),
-  shopping_list: z.record(z.string(), z.array(ShoppingItemSchema)),
+  shopping_list: z.array(ShoppingCategorySchema),
+  research_audit: z.array(z.string()).default([]),
 });
 
 export const PlannerFormSchema = z.object({
   budget: z.number().min(10).max(10000),
   persons: z.number().min(1).max(20),
   mealType: z.enum(["dinner", "lunch-dinner", "all"]),
-  period: z.enum(["1 week", "2 weeks", "1 month"]),
+  period: z.enum(["1 week", "2 weeks", "3 weeks", "1 month"]),
   drive: z.enum(["leclerc", "carrefour", "intermarche", "auchan", "cora", "monoprix"]),
+  zipCode: z.string().length(5).regex(/^\d+$/, "Doit être 5 chiffres").optional(),
+  selectedStore: z.string().optional(),
+  selectedStoreUrl: z.string().optional(),
   preferences: z.array(z.string()),
   exclusions: z.array(z.string()),
   cuisineStyle: z.string(),

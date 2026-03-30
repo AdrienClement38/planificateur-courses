@@ -18,38 +18,64 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background selection:bg-primary/30">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <ShoppingCart className="h-4 w-4" />
+      <header className="sticky top-0 z-50 border-b border-white/5 bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
+          <div className="flex items-center gap-3">
+            <div className="flex items-baseline text-2xl font-black tracking-tighter uppercase italic">
+              <span className="text-white">Drive</span>
+              <span className="text-primary">Planner</span>
+            </div>
+            <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+              Drive
+            </div>
           </div>
-          <div>
-            <h1 className="text-sm font-bold leading-none">Drive Planner</h1>
-            <p className="text-xs text-muted-foreground">Planification repas & courses</p>
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5">
+            <ShoppingCart className="h-5 w-5 text-muted-foreground" />
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-10">
+      <main className="mx-auto max-w-5xl px-6 py-16">
         {!plan && !isLoading && (
-          <div className="mb-10">
-            <h2 className="mb-2 text-3xl font-bold tracking-tight">
+          <div className="mb-16 space-y-6">
+            <h2 className="max-w-3xl text-6xl font-black leading-[0.9] tracking-tighter uppercase sm:text-7xl">
               Ton menu du mois,{" "}
-              <span className="text-primary">sans prise de tête.</span>
+              <br />
+              <span className="text-primary italic">sans prise de tête.</span>
             </h2>
-            <p className="text-muted-foreground">
-              Renseigne ton budget, tes contraintes et ton drive. L&apos;IA génère
-              le planning et la liste de courses prête à commander.
+            <p className="max-w-xl text-lg text-muted-foreground">
+              Donne ton budget, tes contraintes et le nombre de repas. L'IA génère le planning et la liste de courses prête pour le drive.
             </p>
           </div>
         )}
 
         {error && (
-          <Alert variant="destructive" className="mb-6">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+          <Alert variant="destructive" className="mb-6 flex items-start gap-4">
+            <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+            <div className="flex-1 space-y-2">
+              <AlertDescription className="font-semibold text-base leading-tight">
+                {error.message}
+              </AlertDescription>
+              {(error.details || error.rawResponse || error.json) && (
+                <details className="group">
+                  <summary className="cursor-pointer text-[10px] font-bold tracking-widest text-white/50 uppercase transition-colors hover:text-white">
+                    Détails techniques
+                  </summary>
+                  <div className="mt-3 overflow-hidden rounded-lg border border-white/10 bg-black/40 p-4 font-mono text-[11px] leading-relaxed text-white/70">
+                    <pre className="max-h-60 overflow-auto whitespace-pre-wrap">
+                      {JSON.stringify({
+                        details: error.details,
+                        stop_reason: error.stop_reason,
+                        rawResponse: error.rawResponse,
+                        json: error.json
+                      }, null, 2)}
+                    </pre>
+                  </div>
+                </details>
+              )}
+            </div>
           </Alert>
         )}
 

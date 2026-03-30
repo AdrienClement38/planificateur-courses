@@ -10,54 +10,39 @@ const MEAL_TYPE_LABELS: Record<string, string> = {
 export function buildMealPlanPrompt(data: PlannerFormData): string {
   const drive = DRIVES[data.drive];
 
-  return `Tu es un assistant expert en planification de repas et en optimisation de courses.
-Génère un planning de repas complet et une liste de courses optimisée pour le drive.
+  return `Tu es un assistant expert en planification de repas.
+Génère un planning COMPLET et une liste de courses pour le drive.
 
 PARAMÈTRES :
-- Budget total : ${data.budget}€
-- Nombre de personnes : ${data.persons}
-- Repas à couvrir : ${MEAL_TYPE_LABELS[data.mealType]}
-- Période : ${data.period}
-- Enseigne drive : ${drive.name}
-- Préférences alimentaires : ${data.preferences.length ? data.preferences.join(", ") : "aucune"}
-- Aliments exclus : ${data.exclusions.length ? data.exclusions.join(", ") : "aucun"}
-- Style de cuisine : ${data.cuisineStyle || "varié et équilibré"}
+- Budget: ${data.budget}€ | Personnes: ${data.persons} | Période: ${data.period}
+- Drive: ${drive.name}
+- Régime: ${data.preferences.join(", ") || "standard"}
+- Exclusions: ${data.exclusions.join(", ") || "aucune"}
+- Localisation: ${data.selectedStore || drive.name} (${data.zipCode || "France"})
+- Lien Magasin: ${data.selectedStoreUrl || drive.home}
 
-RÈGLES STRICTES :
-1. Le coût total estimé doit rester SOUS le budget de ${data.budget}€
-2. Favorise la réutilisation d'ingrédients entre plusieurs repas (anti-gaspillage)
-3. Prix réalistes selon les tarifs ${drive.name} en France en 2024
-4. Temps de préparation max 45 minutes par repas
-5. Variété obligatoire : aucun plat répété
-6. Adapte les quantités au nombre de personnes (${data.persons})
+RÈGLES D'OR :
+1. RECHERCHE PRIORITAIRE : Utilise search_prices uniquement pour les 5 produits les plus chers. Inclus TOUJOURS le lieu exact dans ta recherche.
+2. LIMITE DE RECHERCHE : ⚠️ Ne fais JAMAIS plus de 5 recherches au total. Si tu ne trouves pas rapidement, ARRÊTE de chercher et estime les prix restants avec cohérence.
+3. ZÉRO HALLUCINATION : Ne JAMAIS inventer de nom de produit. Utilise le titre EXACT vu dans le snippet du résultat de recherche (ex: 'Steak haché Férial x4 - 400g').
+4. LIENS OBLIGATOIRES : Chaque article DOIT avoir un lien valide. Si tu n'as pas de lien direct dans le snippet, mets EXACTEMENT "N/A" (le système se chargera de le corriger ensuite).
+5. SÉQUENCE : Fais toutes tes recherches AVANT de commencer le JSON. Ne touche plus aux outils une fois le JSON démarré.
+6. LIENS BRUTS : INTERDICTION ABSOLUE de simplifier ou "nettoyer" les URLs (ex: ne pas transformer un lien fd11-courses... en www.leclercdrive...). Utilise le lien EXACT fourni par l'outil.
+7. AUDIT DE RECHERCHE : Remplis le champ "research_audit" avec des preuves textuelles de tes recherches (ex: "Produit X trouvé à 5.42€ sur le lien Y").
+8. BUDGET : Reste SOUS ${data.budget}€.
+9. FORMAT : Réponds UNIQUEMENT en JSON compact.
 
-STRUCTURE JSON OBLIGATOIRE (réponds uniquement en JSON valide, zéro markdown) :
+STRUCTURE JSON (ZÉRO TEXTE HORS DU JSON, finis par }) :
 {
-  "summary": "Phrase courte et engageante résumant le planning",
+  "summary": "Court et précis",
   "estimated_total": 0.00,
-  "meals": [
+  "meals": [{"day":"Jour","name":"Déj: Nom / Dîn: Nom","tags":["tag"]}],
+  "shopping_list": [
     {
-      "day": "Lundi soir",
-      "name": "Nom du repas",
-      "tags": ["rapide", "équilibré", "végétarien"]
+      "category": "Rayon", 
+      "items": [{"name":"Produit","qty":"Q","unit_price":0.00,"total_price":0.00,"link":"URL"}]
     }
   ],
-  "shopping_list": {
-    "Féculents & céréales": [
-      {
-        "name": "Pâtes spaghetti 500g",
-        "qty": "2 paquets",
-        "unit_price": 1.20,
-        "total_price": 2.40
-      }
-    ],
-    "Viandes & protéines": [],
-    "Légumes & fruits": [],
-    "Produits laitiers & œufs": [],
-    "Épicerie & condiments": [],
-    "Surgelés": [],
-    "Boissons": [],
-    "Petit-déjeuner": []
-  }
+  "research_audit": ["Preuve 1", "Preuve 2"]
 }`;
 }

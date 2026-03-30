@@ -7,7 +7,7 @@ import { MealPlanGrid } from "@/components/meal-plan/MealPlanGrid";
 import { ShoppingList } from "@/components/shopping/ShoppingList";
 import { DRIVES } from "@/lib/drives";
 import type { MealPlan, DriveKey } from "@/types";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, SearchCheck } from "lucide-react";
 
 interface PlanResultsProps {
   plan: MealPlan;
@@ -56,6 +56,9 @@ export function PlanResults({ plan, budget, driveKey, onReset }: PlanResultsProp
           <TabsTrigger value="shopping" className="flex-1">
             🛒 Liste de courses
           </TabsTrigger>
+          <TabsTrigger value="research" className="flex-1">
+            🔍 Preuves & Validation
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="meals" className="mt-6">
@@ -64,6 +67,29 @@ export function PlanResults({ plan, budget, driveKey, onReset }: PlanResultsProp
 
         <TabsContent value="shopping" className="mt-6">
           <ShoppingList shoppingList={plan.shopping_list} driveKey={driveKey} />
+        </TabsContent>
+        
+        <TabsContent value="research" className="mt-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] text-muted-foreground uppercase mb-4">
+              <SearchCheck className="h-4 w-4 text-primary" />
+              Journal d&apos;audit de recherche IA
+            </div>
+            <div className="grid gap-3">
+              {plan.research_audit?.map((step, i) => (
+                <div 
+                  key={i} 
+                  className="p-3 rounded-lg border border-white/5 bg-white/[0.02] text-xs leading-relaxed text-white/70"
+                >
+                  {step}
+                </div>
+              )) || (
+                <div className="p-8 text-center text-muted-foreground text-sm border border-dashed rounded-lg">
+                  Aucun log de recherche disponible pour cette génération.
+                </div>
+              )}
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

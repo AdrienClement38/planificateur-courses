@@ -8,16 +8,20 @@ export const metadata: Metadata = {
     "Générez votre planning repas et liste de courses optimisée pour votre drive avec l'IA.",
 };
 
+import { ThemeProvider } from "next-themes";
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" suppressHydrationWarning>
-      <body className="font-sans antialiased">
-        {children}
-        <Toaster />
+    <html lang="fr" suppressHydrationWarning className="dark">
+      <body className="font-sans antialiased bg-background text-foreground">
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+          {children}
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );

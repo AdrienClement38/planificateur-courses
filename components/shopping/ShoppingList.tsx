@@ -17,7 +17,8 @@ export function ShoppingList({ shoppingList, driveKey }: ShoppingListProps) {
     let text = `LISTE DE COURSES — ${drive.name.toUpperCase()}\n`;
     text += `${"=".repeat(40)}\n\n`;
 
-    for (const [category, items] of Object.entries(shoppingList)) {
+    for (const categoryData of shoppingList) {
+      const { category, items } = categoryData;
       if (!items?.length) continue;
       text += `\n== ${category} ==\n`;
       for (const item of items) {
@@ -33,8 +34,8 @@ export function ShoppingList({ shoppingList, driveKey }: ShoppingListProps) {
     URL.revokeObjectURL(a.href);
   };
 
-  const nonEmptyCategories = Object.entries(shoppingList).filter(
-    ([, items]) => items?.length > 0
+  const nonEmptyCategories = shoppingList.filter(
+    (c) => c.items?.length > 0
   );
 
   return (
@@ -47,7 +48,7 @@ export function ShoppingList({ shoppingList, driveKey }: ShoppingListProps) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {nonEmptyCategories.map(([category, items]) => (
+        {nonEmptyCategories.map(({ category, items }) => (
           <div key={category} className="rounded-xl border bg-card p-4">
             <p className="mb-3 text-xs font-bold uppercase tracking-widest text-primary">
               {category}
@@ -66,7 +67,7 @@ export function ShoppingList({ shoppingList, driveKey }: ShoppingListProps) {
                     {item.total_price.toFixed(2)}€
                   </span>
                   <a
-                    href={drive.buildSearchUrl(item.name)}
+                    href={item.link || drive.buildSearchUrl(item.name)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="shrink-0 rounded-md border p-1 text-muted-foreground transition-colors hover:border-primary hover:text-primary"
