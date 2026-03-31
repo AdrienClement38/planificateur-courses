@@ -14,7 +14,7 @@ export default function AdminPage() {
   const startUpdate = async () => {
     setIsRunning(true);
     setLogs([]);
-    
+
     try {
       const response = await fetch("/api/update-prices", {
         method: "POST"
@@ -54,6 +54,10 @@ export default function AdminPage() {
               const data = JSON.parse(dataStr);
               // Add to top of list
               setLogs(prev => [data, ...prev]);
+
+              if (data.search_url) {
+                console.log(`[Admin] Search URL for ${data.product}: ${data.search_url}`);
+              }
               console.log("[Admin] Update event:", data);
             } catch (e) {
               console.error("Failed to parse SSE data", dataStr);
@@ -98,8 +102,8 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <Button 
-                onClick={startUpdate} 
+              <Button
+                onClick={startUpdate}
                 disabled={isRunning}
                 className="w-full sm:w-40"
               >
@@ -125,22 +129,22 @@ export default function AdminPage() {
                     <span className="text-primary font-bold">Terminé !</span>
                   )}
                 </div>
-                
+
                 <div className="h-[400px] rounded-lg border border-white/10 bg-black/50 p-4 font-mono text-[11px] leading-relaxed custom-scrollbar overflow-hidden flex flex-col">
                   {/* Logs mapped in reverse order so latest is on top */}
                   <div className="space-y-1 overflow-y-auto pr-2">
                     {logs.map((log, i) => {
                       if (log.summary) {
-                         return (
-                           <div key={i} className="flex items-start gap-2 py-2 border-b border-white/5 last:border-0 hover:bg-white/5 px-2 rounded -mx-2">
-                             <div className="mt-0.5 shrink-0"><CheckCircle2 className="h-4 w-4 text-green-400" /></div>
-                             <div className="flex-1 text-green-400 font-bold">
-                                Bilan : {log.summary.updated} mis à jour, {log.summary.unchanged} inchangés, {log.summary.errors} erreurs. Total : {log.summary.total}
-                             </div>
-                           </div>
-                         );
+                        return (
+                          <div key={i} className="flex items-start gap-2 py-2 border-b border-white/5 last:border-0 hover:bg-white/5 px-2 rounded -mx-2">
+                            <div className="mt-0.5 shrink-0"><CheckCircle2 className="h-4 w-4 text-green-400" /></div>
+                            <div className="flex-1 text-green-400 font-bold">
+                              Bilan : {log.summary.updated} mis à jour, {log.summary.unchanged} inchangés, {log.summary.errors} erreurs. Total : {log.summary.total}
+                            </div>
+                          </div>
+                        );
                       }
-                      
+
                       const status = log.status || "info";
 
                       return (
@@ -154,12 +158,17 @@ export default function AdminPage() {
                             ) : status === "error" ? (
                               <div className="text-destructive">
                                 <span className="font-semibold">{log.product}</span> - Échec ({log.reason})
+                                {log.error_detail && (
+                                  <div className="mt-1 p-2 bg-red-900/20 border border-red-500/20 rounded text-[10px] font-mono whitespace-pre-wrap break-all text-red-300">
+                                    {log.error_detail}
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               <div className={status === "updated" ? "text-green-300" : "text-white/60"}>
-                                <span className="font-semibold">{log.product}</span> : 
-                                {status === "updated" 
-                                  ? ` ${log.old_price}€ ➔ ${log.new_price}€` 
+                                <span className="font-semibold">{log.product}</span> :
+                                {status === "updated"
+                                  ? ` ${log.old_price}€ ➔ ${log.new_price}€`
                                   : ` ${log.new_price}€ (inchangé)`}
                               </div>
                             )}
