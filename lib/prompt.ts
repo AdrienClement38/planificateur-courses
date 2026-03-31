@@ -7,11 +7,15 @@ const MEAL_TYPE_LABELS: Record<string, string> = {
   all: "petit-déjeuner + déjeuner + dîner",
 };
 
-export function buildMealPlanPrompt(data: PlannerFormData): string {
+export function buildMealPlanPrompt(data: PlannerFormData, favorites: any[] = []): string {
   const drive = DRIVES[data.drive];
 
+  const favoritesPrompt = favorites.length > 0 
+    ? `\n\nARTICLES OBLIGATOIRES (FAVORIS) :\nTu DOIS IMPÉRATIVEMENT ajouter les produits suivants dans la "shopping_list" finale, peu importe les recettes générées :\n${favorites.map(f => `- ${f.name} (Marque: ${f.brand || "N/A"}, Format: ${f.quantity || "N/A"}, Prix: ${f.price_ttc}€)`).join("\n")}\n\nAssure-toi de les placer dans la bonne catégorie de rayon.`
+    : "";
+
   return `Tu es un assistant expert en planification de repas.
-Génère un planning COMPLET et une liste de courses pour le drive.
+Génère un planning COMPLET et une liste de courses pour le drive.${favoritesPrompt}
 
 PARAMÈTRES :
 - Budget: ${data.budget}€ | Personnes: ${data.persons} | Période: ${data.period}

@@ -40,6 +40,7 @@ const products = [
   { name: "tomate cerise allongée bicolore", brand: null, quantity: null, category: "Fruits & Légumes", price_ttc: 1.69 },
   { name: "brocoli bio", brand: null, quantity: "sachet x5", category: "Fruits & Légumes", price_ttc: 2.49 },
   { name: "concombre", brand: null, quantity: "1 pièce", category: "Fruits & Légumes", price_ttc: 1.29 },
+  { name: "oignons jaunes filet", brand: "Primeur", quantity: "1kg", category: "Fruits & Légumes", price_ttc: 1.99 },
 
   // === PRODUITS LAITIERS & ŒUFS ===
   { name: "fromage blanc nature 0%mg", brand: "Délisse", quantity: "8x100g", category: "Laitier Œufs", price_ttc: 1.79 },
@@ -59,6 +60,9 @@ const products = [
   { name: "œufs plein air", brand: null, quantity: "x12", category: "Laitier Œufs", price_ttc: 4.53 },
   { name: "dessert pomme", brand: null, quantity: "16x100g", category: "Laitier Œufs", price_ttc: 2.80 },
   { name: "fromage blanc nature", brand: null, quantity: "4x100g", category: "Laitier Œufs", price_ttc: 0.97 },
+  { name: "lait demi-écrémé UHT", brand: "Délisse", quantity: "6x1L", category: "Laitier Œufs", price_ttc: 5.60 },
+  { name: "crème fraîche épaisse 30% mg", brand: "Délisse", quantity: "50cl", category: "Laitier Œufs", price_ttc: 2.15 },
+  { name: "beurre doux 82% mg", brand: "Les Croisés", quantity: "250g", category: "Laitier Œufs", price_ttc: 2.30 },
   { name: "épinards hachés crème", brand: null, quantity: "500g", category: "Surgelés", price_ttc: 2.32 },
 
   // === CHARCUTERIE & TRAITEUR ===
@@ -87,6 +91,7 @@ const products = [
   { name: "thon entier nature", brand: null, quantity: "2x1/4", category: "Épicerie Salée", price_ttc: 3.75 },
   { name: "ratatouille provençale bocal", brand: null, quantity: "530g", category: "Épicerie Salée", price_ttc: 2.79 },
   { name: "petits pois étuvés", brand: null, quantity: null, category: "Épicerie Salée", price_ttc: 0.90 },
+  { name: "coquillettes qualité supérieure", brand: null, quantity: "500g", category: "Épicerie Salée", price_ttc: 0.95 },
 
   // === ÉPICERIE SUCRÉE ===
   { name: "tablette chocolat noir 72%", brand: "Equador", quantity: "100g", category: "Épicerie Sucrée", price_ttc: 1.39 },

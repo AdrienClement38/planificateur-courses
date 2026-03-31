@@ -17,10 +17,11 @@ interface PlanResultsProps {
   budget: number;
   driveKey: DriveKey;
   storeUrl?: string;
+  storeId?: string;
   onReset: () => void;
 }
 
-export function PlanResults({ plan, budget, driveKey, storeUrl, onReset }: PlanResultsProps) {
+export function PlanResults({ plan, budget, driveKey, storeUrl, storeId, onReset }: PlanResultsProps) {
   const drive = DRIVES[driveKey];
   const { pricingStatus, pricedCount, resolvedItems, startPricing } = usePricing();
 
@@ -31,9 +32,9 @@ export function PlanResults({ plan, budget, driveKey, storeUrl, onReset }: PlanR
 
   useEffect(() => {
     if (allItems.length > 0 && pricingStatus === "idle") {
-      startPricing(allItems, driveKey, "echirolles-comboire");
+      startPricing(allItems, driveKey, storeId);
     }
-  }, [allItems, driveKey, startPricing, pricingStatus]);
+  }, [allItems, driveKey, startPricing, pricingStatus, storeId]);
 
   // Calculate real total based on resolved prices + estimated for remaining
   const dynamicTotal = useMemo(() => {

@@ -93,10 +93,16 @@ export async function findStores(drive: string, zipCode: string) {
        cleanUrl = "https://fd11-courses.leclercdrive.fr/magasin-063801-063801-echirolles---comboire.aspx";
     }
 
+    // Generate unique ID
+    let id = cleanName.toLowerCase().includes("echirolles") 
+      ? "echirolles-comboire" 
+      : cleanName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
     return {
       name: cleanName,
       address: res.snippet || "",
       url: cleanUrl,
+      id
     };
   }) || [];
 

@@ -13,6 +13,8 @@ function normalize(text: string): string {
   if (!text) return "";
   return text
     .toLowerCase()
+    .replace(/œ/g, "oe")
+    .replace(/æ/g, "ae")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "") // Remove accents
     .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, " ") // Remove punctuation
@@ -43,8 +45,20 @@ export async function findProductPrice(
     }
   });
 
+  console.log(`[Pricing] findProductPrice("${productName}", "${driveKey}", "${storeId}") -> dbProducts: ${dbProducts.length}`);
+  if (dbProducts.length > 0) {
+    console.log(`[Pricing] First product in DB: "${dbProducts[0].name}"`);
+  }
+
   // 1. Try Exact Normalized Match
-  const exactMatch = dbProducts.find(p => normalize(p.name) === normInput);
+  const exactMatch = dbProducts.find((p: any) => {
+    const dbNorm = normalize(p.name);
+    const isMatch = dbNorm === normInput;
+    if (p.name.includes("œuf")) {
+        console.log(`[Pricing] Exact check: DB="${p.name}" (norm="${dbNorm}") vs Input="${normInput}" -> ${isMatch}`);
+    }
+    return isMatch;
+  });
   if (exactMatch) {
     return {
       price_ttc: exactMatch.price_ttc,
@@ -55,9 +69,13 @@ export async function findProductPrice(
 
   // 2. Try Partial Match: if all significant words of the input are in the DB product name
   // This helps matching "filet de poulet" to "filet de poulet blanc"
-  const partialMatch = dbProducts.find(p => {
+  const partialMatch = dbProducts.find((p: any) => {
     const dbNorm = normalize(p.name);
-    return inputWords.every(word => dbNorm.includes(word));
+    const isMatch = inputWords.every(word => dbNorm.includes(word));
+    if (p.name.includes("œuf")) {
+        console.log(`[Pricing] Partial check: DB="${p.name}" (norm="${dbNorm}") vs inputWords=${JSON.stringify(inputWords)} -> ${isMatch}`);
+    }
+    return isMatch;
   });
 
   if (partialMatch) {
@@ -70,7 +88,7 @@ export async function findProductPrice(
 
   // 3. Reverse Partial Match: if the DB name is a subset of the input name
   // Helps matching "yaourt skyr stracci" to "yaourt skyr stracciatella" (if normalized words match)
-  const reverseMatch = dbProducts.find(p => {
+  const reverseMatch = dbProducts.find((p: any) => {
     const dbNorm = normalize(p.name);
     const dbWords = dbNorm.split(" ");
     return dbWords.every(word => normInput.includes(word));

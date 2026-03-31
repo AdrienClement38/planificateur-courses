@@ -9,17 +9,24 @@ export const metadata: Metadata = {
 };
 
 import { ThemeProvider } from "next-themes";
+import { Navbar } from "@/components/layout/Navbar";
+import { cookies } from "next/headers";
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const isAuthenticated = cookieStore.has("drive-planner-auth");
   return (
     <html lang="fr" suppressHydrationWarning className="dark">
-      <body className="font-sans antialiased bg-background text-foreground">
+      <body className="font-sans antialiased bg-background text-foreground flex flex-col min-h-screen">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-          {children}
+          {isAuthenticated && <Navbar />}
+          <div className="flex-1 flex flex-col">
+            {children}
+          </div>
           <Toaster />
         </ThemeProvider>
       </body>

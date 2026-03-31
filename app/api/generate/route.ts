@@ -5,6 +5,7 @@ import { MealPlanSchema, PlannerFormSchema } from "@/lib/schemas";
 import { searchPrices } from "@/lib/search";
 import { DRIVES } from "@/lib/drives";
 import { chatWithGemini } from "@/lib/gemini";
+import { prisma } from "@/lib/db";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -24,10 +25,14 @@ export async function POST(req: NextRequest) {
 
     const formData = parsed.data;
     const drive = DRIVES[formData.drive];
+    
+    // Fetch all user favorites to force them into the AI shopping list
+    const favorites = await prisma.product.findMany({ where: { is_favorite: true } });
+    
     const prompt = buildMealPlanPrompt({
       ...formData,
       zipCode: formData.zipCode || "",
-    });
+    }, favorites);
 
     const tools: any[] = [
       {

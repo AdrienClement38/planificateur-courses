@@ -41,3 +41,19 @@ yarn-error.log*
 next-env.d.ts
 
 /lib/generated/prisma
+
+# debug and test scripts
+test-*.js
+test-*.ts
+scripts/experiments/
+models.json
+
+# test suites and coverage
+__tests__/
+tests/
+coverage/
+cypress/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts

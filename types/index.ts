@@ -21,6 +21,7 @@ export interface PlannerFormData {
   zipCode: string;
   selectedStore?: string;
   selectedStoreUrl?: string;
+  selectedStoreId?: string;
   preferences: string[];
   exclusions: string[];
   cuisineStyle: string;

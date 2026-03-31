@@ -19,23 +19,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background selection:bg-primary/30">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/5 bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
-          <div className="flex items-center gap-3">
-            <div className="flex items-baseline text-2xl font-black tracking-tighter uppercase italic">
-              <span className="text-white">Drive</span>
-              <span className="text-primary">Planner</span>
-            </div>
-            <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
-              Drive
-            </div>
-          </div>
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5">
-            <ShoppingCart className="h-5 w-5 text-muted-foreground" />
-          </div>
-        </div>
-      </header>
+
 
       <main className="mx-auto max-w-5xl px-6 py-16">
         {!plan && !isLoading && (
@@ -99,6 +83,7 @@ export default function Home() {
             budget={lastFormData.budget}
             driveKey={lastFormData.drive}
             storeUrl={lastFormData.selectedStoreUrl}
+            storeId={lastFormData.selectedStoreId}
             onReset={reset}
           />
         )}

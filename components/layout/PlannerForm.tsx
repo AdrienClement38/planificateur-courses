@@ -44,10 +44,11 @@ export function PlannerForm({ onSubmit, isLoading }: PlannerFormProps) {
   const [preferences, setPreferences] = useState<string[]>([]);
   const [exclusions, setExclusions] = useState<string[]>([]);
   const [zipCode, setZipCode] = useState("");
-  const [stores, setStores] = useState<{name: string; address: string; url: string}[]>([]);
+  const [stores, setStores] = useState<{name: string; address: string; url: string; id: string}[]>([]);
   const [isSearchingStores, setIsSearchingStores] = useState(false);
   const [selectedStore, setSelectedStore] = useState("");
   const [selectedStoreUrl, setSelectedStoreUrl] = useState("");
+  const [selectedStoreId, setSelectedStoreId] = useState("");
   const [cuisineStyle, setCuisineStyle] = useState("");
 
   const handleSearchStores = async () => {
@@ -78,6 +79,7 @@ export function PlannerForm({ onSubmit, isLoading }: PlannerFormProps) {
       zipCode,
       selectedStore,
       selectedStoreUrl,
+      selectedStoreId,
       preferences,
       exclusions,
       cuisineStyle,
@@ -130,6 +132,7 @@ export function PlannerForm({ onSubmit, isLoading }: PlannerFormProps) {
                     onClick={() => {
                       setSelectedStore(s.name);
                       setSelectedStoreUrl(s.url);
+                      setSelectedStoreId(s.id);
                     }}
                     className={`text-left p-3 rounded-lg border transition-all relative group ${
                       selectedStore === s.name 
