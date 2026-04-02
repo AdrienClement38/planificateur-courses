@@ -18,9 +18,10 @@ model Product {
   category     String                        // Catégorie (ex: "Viandes & Poissons")
   search_url   String?                       // URL de recherche sur le drive
   last_updated DateTime @default(now())
-  source       String   @default("manual")   // "manual" | "scrape" | "invoice"
-  is_favorite  Boolean  @default(false)      // Articles obligatoires pour toutes les commandes
-  is_banned    Boolean  @default(false)      // Articles à ignorer dans les menus
+  source           String   @default("manual")   // "manual" | "scrape" | "invoice"
+  is_favorite      Boolean  @default(false)      // Articles obligatoires pour toutes les commandes
+  is_banned         Boolean  @default(false)      // Articles à ignorer dans les menus
+  needs_scraping   Boolean  @default(false)      // Marqueur pour rafraîchir le prix plus tard
 
   @@unique([name, drive, store_id])
   @@index([name, drive])

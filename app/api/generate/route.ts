@@ -174,7 +174,15 @@ export async function POST(req: NextRequest) {
                 domain = drive.home.replace("https://", "").replace("www.", "").split("/")[0];
               }
 
-              const searchResults = await searchPrices((args as any).query, drive.name, domain, location);
+              const query = (args as any).query;
+              if (!query || query === "undefined") {
+                toolResultsParts.push({
+                  functionResponse: { name, response: { error: "Query is required" } }
+                });
+                continue;
+              }
+
+              const searchResults = await searchPrices(query, drive.name, domain);
               toolResultsParts.push({
                 functionResponse: {
                   name,
@@ -346,10 +354,21 @@ export async function POST(req: NextRequest) {
       try {
         const planRaw = JSON.parse(jsonText);
 
-        // Clean up hallucinations and broken links
+        // Clean up hallucinations, broken links and BANNED items
+        const currentBannedNames = bannedProducts.map(b => b.name.toLowerCase());
+
         if (planRaw.shopping_list) {
           planRaw.shopping_list.forEach((category: any) => {
             if (category.items) {
+              category.items = category.items.filter((item: any) => {
+                const isBanned = currentBannedNames.some(bn => item.name.toLowerCase().includes(bn) || bn.includes(item.name.toLowerCase()));
+                if (isBanned) {
+                  console.warn(`[/api/generate] Removing banned item from final list: ${item.name}`);
+                  return false;
+                }
+                return true;
+              });
+
               category.items.forEach((item: any) => {
                 // If link is missing, "N/A", fake, or the dead national search link, use search fallback
                 if (!item.link || item.link.toLowerCase().includes("n/a") || !item.link.startsWith("http") || item.link.includes("leclercdrive.fr/recherche")) {

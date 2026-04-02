@@ -16,7 +16,12 @@ export function buildMealPlanPrompt(
   const drive = DRIVES[data.drive];
 
   const bannedPrompt = bannedProducts.length > 0
-    ? `\n\nPRODUITS INTERDITS (LISTE NOIRE) :\nTu as l'INTERDICTION ABSOLUE de proposer les produits ou ingrédients suivants dans les recettes ou la liste de courses. Si une recette classique en contient, trouve une alternative ou propose un autre plat :\n${bannedProducts.map(b => `- ${b.name}`).join("\n")}`
+    ? `\n\nPRODUITS INTERDITS (LISTE NOIRE) :\nTu as l'INTERDICTION ABSOLUE de proposer les produits ou ingrédients suivants dans les recettes ou la liste de courses. 
+    STRATÉGIE DE SUBSTITUTION :
+    1. Si une recette contient normalement un ingrédient banni, tu DOIS le remplacer par une alternative sûre (ex: lait d'amande au lieu de lait, dinde au lieu de porc).
+    2. Si aucune substitution simple n'est possible, tu DOIS changer totalement de plat pour un repas qui n'utilise pas ces ingrédients.
+    
+    Liste des produits interdits :\n${bannedProducts.map(b => `- ${b.name}`).join("\n")}`
     : "";
 
   const favoritesPrompt = favorites.length > 0
