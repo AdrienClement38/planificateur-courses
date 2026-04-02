@@ -29,7 +29,11 @@ export function buildMealPlanPrompt(
     : "";
 
   const favoriteMealsPrompt = favoriteMeals.length > 0
-    ? `\n\nREPAS FAVORIS (INCONTOURNABLES) :\nL'utilisateur APPRÉCIE BEAUCOUP les plats suivants. Inclus-les judicieusement au moins une fois dans le planning complet (en priorité là où ils étaient prévus : petit-déjeuner, déjeuner ou dîner), mais sans répétition excessive :\n${favoriteMeals.map(m => {
+    ? `\n\nREPAS FAVORIS (INCONTOURNABLES) :\nL'utilisateur APPRÉCIE BEAUCOUP les plats suivants. 
+    STRATÉGIE DE PLACEMENT :
+    1. Inclus-les judicieusement au moins une fois dans le planning complet.
+    2. ⚠️ ALÉATOIRE : Ne les place PAS systématiquement aux Jours 1 et 2. Répartis-les de manière imprévisible sur toute la période (ex: un le Jour 4, un le Jour 12 si c'est sur 2 semaines).
+    3. Respecte la priorité (petit-déjeuner, déjeuner ou dîner) mais sans répétition excessive :\n${favoriteMeals.map(m => {
         const parts = [];
         if (m.breakfast) parts.push(`[Petit-déjeuner] ${m.breakfast}`);
         if (m.lunch) parts.push(`[Déjeuner] ${m.lunch}`);
@@ -90,6 +94,7 @@ RÈGLES D'OR :
 12. ⚠️ FAVORIS : Inclus tes "REPAS FAVORIS" listés ci-dessus au moins une fois, mais respectant la règle d'anti-répétition ci-dessous.
 13. ⚠️ ANTI-RÉPÉTITION : Ne propose jamais le même plat exact (même nom) plus d'UNE fois par semaine, et pas plus de DEUX fois au total sur tout le planning. Varie les recettes même pour les favoris.
 14. ⚠️ PRÉVENTION DE BOUCLE : Si tu commences à générer une liste répétitive (ex: le même ingrédient encore et encore), ARRÊTE-TOI IMMÉDIATEMENT et passe au repas suivant. NE GÉNÈRE JAMAIS plus de 30000 caractères par réponse totale. ⚠️ LE JSON DOIT ÊTRE COMPLET ET FINIR PAR "}". MÊME SI TU DOIS RÉDUIRE LE CONTENU, NE COUPE JAMAIS AU MILIEU D'UNE PHRASE OU D'UN OBJET. TOUTES LES ACCOLADES ET CROCHETS DOIVENT ÊTRE FERMÉS.
+15. ⚠️ RÉPARTITION DES FAVORIS : Ne concentre JAMAIS les repas favoris sur les premiers jours. Mélange-les avec le reste pour un planning équilibré et imprévisible.
 
 STRUCTURE JSON (ZÉRO TEXTE HORS DU JSON, finis par }) :
 {
