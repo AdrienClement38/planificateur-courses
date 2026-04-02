@@ -38,14 +38,28 @@ export function PlanResults({ plan, budget, driveKey, storeUrl, storeId, onReset
 
   // Calculate real total based on resolved prices + estimated for remaining
   const dynamicTotal = useMemo(() => {
+    const getMultiplier = (qty: string) => {
+      const norm = qty.toLowerCase().trim();
+      const countMatch = norm.match(/^x?\s*(\d+)$/);
+      if (countMatch) {
+        const val = parseInt(countMatch[1]);
+        return (val > 0 && val <= 20) ? val : 1;
+      }
+      if (norm.includes("g") || norm.includes("kg") || norm.includes("l") || norm.includes("ml")) return 1;
+      const val = parseFloat(norm);
+      return (val > 0 && val <= 10) ? val : 1;
+    };
+
     let total = 0;
     plan.shopping_list.forEach(cat => {
       cat.items.forEach(item => {
+        const multiplier = getMultiplier(item.qty);
         const resolved = resolvedItems.get(item.name);
+
         if (resolved && resolved.price !== null) {
-          total += resolved.price;
+          total += resolved.price * multiplier;
         } else {
-          total += item.total_price; // Fallback to AI estimate
+          total += (item.total_price || 0);
         }
       });
     });
@@ -91,7 +105,7 @@ export function PlanResults({ plan, budget, driveKey, storeUrl, storeId, onReset
             <Progress value={(pricedCount / allItems.length) * 100} className="h-1.5" />
           </div>
         )}
-        
+
         {pricingStatus === "done" && (
           <div className="flex items-center gap-2 text-xs font-medium text-green-500 bg-green-500/5 py-2 px-3 rounded-md border border-green-500/20">
             <CheckCircle2 className="h-4 w-4" />
@@ -121,14 +135,14 @@ export function PlanResults({ plan, budget, driveKey, storeUrl, storeId, onReset
         </TabsContent>
 
         <TabsContent value="shopping" className="mt-6">
-          <ShoppingList 
-            shoppingList={plan.shopping_list} 
-            driveKey={driveKey} 
-            resolvedItems={resolvedItems} 
+          <ShoppingList
+            shoppingList={plan.shopping_list}
+            driveKey={driveKey}
+            resolvedItems={resolvedItems}
             storeUrl={storeUrl}
           />
         </TabsContent>
-        
+
         <TabsContent value="research" className="mt-6">
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] text-muted-foreground uppercase mb-4">
@@ -137,17 +151,17 @@ export function PlanResults({ plan, budget, driveKey, storeUrl, storeId, onReset
             </div>
             <div className="grid gap-3">
               {plan.research_audit?.map((step, i) => (
-                <div 
-                  key={i} 
+                <div
+                  key={i}
                   className="p-3 rounded-lg border border-white/5 bg-white/[0.02] text-xs leading-relaxed text-white/70"
                 >
                   {step}
                 </div>
               )) || (
-                <div className="p-8 text-center text-muted-foreground text-sm border border-dashed rounded-lg">
-                  Aucun log de recherche disponible pour cette génération.
-                </div>
-              )}
+                  <div className="p-8 text-center text-muted-foreground text-sm border border-dashed rounded-lg">
+                    Aucun log de recherche disponible pour cette génération.
+                  </div>
+                )}
             </div>
           </div>
         </TabsContent>

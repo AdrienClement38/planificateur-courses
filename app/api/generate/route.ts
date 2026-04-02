@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+
+export const maxDuration = 60; // Extend timeout for long AI generations
+
 import Anthropic from "@anthropic-ai/sdk";
 import { buildMealPlanPrompt } from "@/lib/prompt";
 import { MealPlanSchema, PlannerFormSchema } from "@/lib/schemas";
-import { searchPrices } from "@/lib/search";
+import { searchPrices, resolveShoppingListPrices } from "@/lib/search";
 import { DRIVES } from "@/lib/drives";
-import { chatWithGemini } from "@/lib/gemini";
+import { chatWithGemini, hasAvailableGeminiKeys } from "@/lib/gemini";
 import { prisma } from "@/lib/db";
 
 const anthropic = new Anthropic({
@@ -25,14 +28,17 @@ export async function POST(req: NextRequest) {
 
     const formData = parsed.data;
     const drive = DRIVES[formData.drive];
-    
-    // Fetch all user favorites to force them into the AI shopping list
-    const favorites = await prisma.product.findMany({ where: { is_favorite: true } });
-    
+
+    // Fetch all user favorites (products and meals) to influence the AI
+    const [favorites, favoriteMeals] = await Promise.all([
+      prisma.product.findMany({ where: { is_favorite: true } }),
+      prisma.favoriteMeal.findMany({ take: 10, orderBy: { createdAt: "desc" } })
+    ]);
+
     const prompt = buildMealPlanPrompt({
       ...formData,
       zipCode: formData.zipCode || "",
-    }, favorites);
+    }, favorites, favoriteMeals);
 
     const tools: any[] = [
       {
@@ -51,16 +57,35 @@ export async function POST(req: NextRequest) {
       },
     ];
 
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    const canUseGemini = await hasAvailableGeminiKeys();
 
-    if (GEMINI_API_KEY) {
-      console.log("[/api/generate] Using Gemini 1.5 Flash (Free Tier)");
+    if (canUseGemini) {
+      console.log("[/api/generate] Using Gemini (DB Keys or Free Tier)");
       let geminiMessages: any[] = [
         {
           role: "user",
           parts: [{ text: prompt }],
         },
       ];
+
+      const mealProperties: any = {
+        day: { type: "STRING" },
+        tags: { type: "ARRAY", items: { type: "STRING" } }
+      };
+      
+      const isLongPeriod = formData.period === "2 weeks" || formData.period === "3 weeks" || formData.period === "1 month";
+      const maxIng = isLongPeriod ? 5 : 10;
+
+      if (formData.mealType === "all") {
+        mealProperties.breakfast = { type: "STRING" };
+        mealProperties.breakfast_ingredients = { type: "ARRAY", items: { type: "STRING" }, maxItems: maxIng };
+      }
+      if (formData.mealType === "all" || formData.mealType === "lunch-dinner") {
+        mealProperties.lunch = { type: "STRING" };
+        mealProperties.lunch_ingredients = { type: "ARRAY", items: { type: "STRING" }, maxItems: maxIng };
+      }
+      mealProperties.dinner = { type: "STRING" };
+      mealProperties.dinner_ingredients = { type: "ARRAY", items: { type: "STRING" }, maxItems: maxIng };
 
       const mealPlanResponseSchema = {
         type: "OBJECT",
@@ -71,12 +96,8 @@ export async function POST(req: NextRequest) {
             type: "ARRAY",
             items: {
               type: "OBJECT",
-              properties: {
-                day: { type: "STRING" },
-                name: { type: "STRING" },
-                tags: { type: "ARRAY", items: { type: "STRING" } }
-              },
-              required: ["day", "name", "tags"]
+              properties: mealProperties,
+              required: ["day", "tags"]
             }
           },
           shopping_list: {
@@ -111,12 +132,12 @@ export async function POST(req: NextRequest) {
         required: ["summary", "estimated_total", "meals", "shopping_list", "research_audit"]
       };
 
-      let geminiResponse = await chatWithGemini(geminiMessages, GEMINI_API_KEY, tools);
+      let geminiResponse = await chatWithGemini(geminiMessages, tools);
       let toolCallsCount = 0;
 
       while (
         geminiResponse.candidates?.[0]?.content?.parts?.some((p: any) => p.functionCall) &&
-        toolCallsCount < 5
+        toolCallsCount < 15
       ) {
         toolCallsCount++;
         const assistantParts = geminiResponse.candidates[0].content.parts;
@@ -127,25 +148,25 @@ export async function POST(req: NextRequest) {
         for (const part of assistantParts) {
           if (part.functionCall) {
             const { name, args } = part.functionCall;
-            
+
             executedToolsThisTurn++;
-            if (executedToolsThisTurn > 5) {
-               console.log(`[/api/generate] Gemini Tool Blocked (Limit Exceeded): ${name}(${JSON.stringify(args)})`);
-               toolResultsParts.push({
-                 functionResponse: {
-                   name,
-                   response: { error: "Search limit exceeded. Please estimate the price for this item based on standard supermarkets." }
-                 }
-               });
-               continue;
+            if (executedToolsThisTurn > 10) {
+              console.log(`[/api/generate] Gemini Tool Blocked (Limit Exceeded): ${name}(${JSON.stringify(args)})`);
+              toolResultsParts.push({
+                functionResponse: {
+                  name,
+                  response: { error: "Search limit exceeded. Please estimate the price for this item based on standard supermarkets." }
+                }
+              });
+              continue;
             }
 
             console.log(`[/api/generate] Gemini Tool Use: ${name}(${JSON.stringify(args)})`);
-            
+
             try {
               let domain = drive.home.replace("https://", "").replace("www.", "").split("/")[0];
               let location = formData.selectedStore || formData.zipCode || "";
-              
+
               if (formData.selectedStoreUrl) {
                 // Although the user selected a specific fd11 URL, we must search the root domain
                 // because Google does not index the session-locked fd11 catalogs.
@@ -172,29 +193,43 @@ export async function POST(req: NextRequest) {
         }
 
         geminiMessages.push({ role: "function", parts: toolResultsParts });
-        
+
         // Respect free-tier RPM limit (4s is safer for multiple tool calls)
         console.log("[/api/generate] GEMINI: Quota safety throttle (4s)...");
         await new Promise(r => setTimeout(r, 4000));
 
-        geminiResponse = await chatWithGemini(geminiMessages, GEMINI_API_KEY, tools);
+        geminiResponse = await chatWithGemini(geminiMessages, tools);
       }
 
-      // Final call after tools loop, with schema enforcement
-      if (geminiResponse.candidates?.[0]?.content?.parts?.some((p: any) => p.functionCall)) {
-          // This should not happen due to while condition, but for safety:
-          geminiResponse = await chatWithGemini(geminiMessages, GEMINI_API_KEY, tools, mealPlanResponseSchema);
-      } else {
-          // Re-request final response with schema to ensure it's valid JSON
-          geminiMessages.push({ role: "user", parts: [{ text: "Génère maintenant le JSON final complet selon le schéma demandé." }] });
-          geminiResponse = await chatWithGemini(geminiMessages, GEMINI_API_KEY, undefined, mealPlanResponseSchema);
-      }
+      // --- CONTEXT DISTILLATION FOR FINAL GENERATION ---
+      // Distill search results to save context window and avoid noise
+      const distilledSearchResults: Record<string, any> = {};
+      geminiMessages.forEach(msg => {
+        if (msg.role === "function") {
+          msg.parts.forEach((part: any) => {
+            if (part.functionResponse) {
+              try {
+                distilledSearchResults[part.functionResponse.name] = JSON.parse(part.functionResponse.response.content);
+              } catch (e) {}
+            }
+          });
+        }
+      });
+
+      console.log(`[/api/generate] GEMINI: Distilling context for final JSON generation...`);
+      const finalPrompt = `Voici les résultats des recherches de prix au drive :\n${JSON.stringify(distilledSearchResults)}\n\nMaintenant, génère le JSON final complet du planning sur ${formData.period} en respectant strictement le budget de ${formData.budget}€ et les favoris.`;
+      
+      // Request final response with a clean history and schema enforcement
+      geminiResponse = await chatWithGemini([
+        { role: "user", parts: [{ text: prompt }] },
+        { role: "user", parts: [{ text: finalPrompt }] }
+      ], undefined, mealPlanResponseSchema);
 
       const finalContent = geminiResponse.candidates?.[0]?.content?.parts
         .map((p: any) => p.text || "")
         .join("");
-      
-      return processResponse(finalContent, "Gemini");
+
+      return await processResponse(finalContent, "Gemini");
     }
 
     async function createMessageWithFallback(messages: any[], tools: any[]) {
@@ -207,7 +242,7 @@ export async function POST(req: NextRequest) {
         "claude-3-haiku-20240307"
       ];
       let lastError;
-      
+
       for (const model of models) {
         try {
           console.log(`[/api/generate] Attempting with model: ${model}`);
@@ -223,7 +258,7 @@ export async function POST(req: NextRequest) {
           lastError = err;
           const status = err.status || err.statusCode || err.error?.status;
           console.error(`[/api/generate] Model ${model} failed with status ${status}:`, err.message);
-          
+
           if (status === 404 || status === 429 || status >= 500) {
             console.warn(`[/api/generate] Retrying with next model...`);
             continue;
@@ -240,7 +275,7 @@ export async function POST(req: NextRequest) {
     let anthropicToolCallsCount = 0;
     while (response.stop_reason === "tool_use" && anthropicToolCallsCount < 10) {
       anthropicToolCallsCount++;
-      
+
       const toolResultsArr = [];
       const toolUseBlocks = response.content.filter((b) => b.type === "tool_use");
 
@@ -248,7 +283,7 @@ export async function POST(req: NextRequest) {
         if (block.type === "tool_use") {
           const { query } = block.input as { query: string };
           console.log(`[/api/generate] Anthropic Tool Use: search_prices("${query}")`);
-          
+
           try {
             const searchResults = await searchPrices(query, drive.name);
             toolResultsArr.push({
@@ -294,22 +329,22 @@ export async function POST(req: NextRequest) {
       .filter((block) => block.type === "text")
       .map((block) => (block as { type: "text"; text: string }).text)
       .join("");
-    
-    allText += finalResponseText;
-    return processResponse(allText, "Anthropic");
 
-    function processResponse(text: string, provider: string) {
+    allText += finalResponseText;
+    return await processResponse(allText, "Anthropic");
+
+    async function processResponse(text: string, provider: string) {
       let jsonText = text.trim();
       const firstBrace = jsonText.indexOf("{");
       const lastBrace = jsonText.lastIndexOf("}");
-      
+
       if (firstBrace !== -1 && lastBrace !== -1) {
         jsonText = jsonText.substring(firstBrace, lastBrace + 1);
       }
 
       try {
         const planRaw = JSON.parse(jsonText);
-        
+
         // Clean up hallucinations and broken links
         if (planRaw.shopping_list) {
           planRaw.shopping_list.forEach((category: any) => {
@@ -318,20 +353,20 @@ export async function POST(req: NextRequest) {
                 // If link is missing, "N/A", fake, or the dead national search link, use search fallback
                 if (!item.link || item.link.toLowerCase().includes("n/a") || !item.link.startsWith("http") || item.link.includes("leclercdrive.fr/recherche")) {
                   let fallbackUrl = drive.buildSearchUrl(item.name);
-                  
+
                   // Dynamic Local URL Reconstruction based on user's pattern
                   if (formData.selectedStoreUrl && formData.selectedStoreUrl.includes("leclercdrive.fr")) {
-                     const urlObj = new URL(formData.selectedStoreUrl);
-                     // If we have an fd-courses or magasin URL, we can reconstruct the local search
-                     if (urlObj.pathname.includes("magasin-")) {
-                       const basePath = urlObj.pathname.replace(".aspx", "");
-                       fallbackUrl = `${urlObj.origin}${basePath}/recherche.aspx?TexteRecherche=${encodeURIComponent(item.name)}`;
-                     } else {
-                       // If we only have the portal URL, drop them at the portal instead of the dead national search
-                       fallbackUrl = formData.selectedStoreUrl;
-                     }
+                    const urlObj = new URL(formData.selectedStoreUrl);
+                    // If we have an fd-courses or magasin URL, we can reconstruct the local search
+                    if (urlObj.pathname.includes("magasin-")) {
+                      const basePath = urlObj.pathname.replace(".aspx", "");
+                      fallbackUrl = `${urlObj.origin}${basePath}/recherche.aspx?TexteRecherche=${encodeURIComponent(item.name)}`;
+                    } else {
+                      // If we only have the portal URL, drop them at the portal instead of the dead national search
+                      fallbackUrl = formData.selectedStoreUrl;
+                    }
                   }
-                  
+
                   item.link = fallbackUrl;
                 }
               });
@@ -342,16 +377,54 @@ export async function POST(req: NextRequest) {
         const planParsed = MealPlanSchema.safeParse(planRaw);
         if (!planParsed.success) {
           console.error(`[/api/generate] ${provider} Schema Validation Error:`, planParsed.error.flatten());
-          return NextResponse.json({ 
-            error: "AI response schema mismatch", 
+          return NextResponse.json({
+            error: "AI response schema mismatch",
             details: planParsed.error.flatten(),
             json: planRaw
           }, { status: 500 });
         }
-        return NextResponse.json({ plan: planParsed.data });
+
+        // --- ZERO ESTIMATION RESOLUTION ---
+        console.log(`[/api/generate] Starting post-generation resolution for ${planParsed.data.shopping_list.length} categories...`);
+        const resolvedShoppingList = await resolveShoppingListPrices(planParsed.data.shopping_list, formData.drive);
+
+        // Recalculate total with real prices
+        let newTotal = 0;
+        resolvedShoppingList.forEach((cat: any) => {
+          cat.items?.forEach((item: any) => {
+            newTotal += item.total_price || 0;
+          });
+        });
+
+        const finalPlan = {
+          ...planParsed.data,
+          shopping_list: resolvedShoppingList,
+          estimated_total: Math.round(newTotal * 100) / 100
+        };
+
+        // --- SAVE TO DATABASE ---
+        try {
+          const db = prisma as any;
+          // Clear previous plan and save new one
+          await db.savedMealPlan.deleteMany({});
+          await db.savedMealPlan.create({
+            data: {
+              planData: JSON.stringify(finalPlan),
+              formData: JSON.stringify(formData)
+            }
+          });
+          console.log("[/api/generate] Meal plan saved to database.");
+        } catch (dbError) {
+          console.error("[/api/generate] Failed to save plan to DB:", dbError);
+          // We don't fail the request if saving to DB fails, just log it.
+        }
+
+        return NextResponse.json({
+          plan: finalPlan
+        });
       } catch (parseError: any) {
         console.error(`[/api/generate] ${provider} JSON Parse Error:`, parseError.message);
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: "Failed to parse AI response as JSON",
           details: parseError.message,
           rawResponse: jsonText.substring(0, 1000)

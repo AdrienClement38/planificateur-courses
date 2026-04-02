@@ -31,3 +31,43 @@ model User {
   password String
   role     String @default("admin")
 }
+
+model FavoriteStore {
+  id        String   @id @default(cuid())
+  name      String
+  address   String
+  url       String   @unique
+  drive     String   // "leclerc", "carrefour", etc.
+  storeId   String?  // The internal store ID if available
+  createdAt DateTime @default(now())
+}
+
+model FavoriteMeal {
+  id                    String   @id @default(cuid())
+  breakfast             String?
+  breakfast_ingredients String?  // Par exemple, JSON stringifié ou liste séparée
+  lunch                 String?
+  lunch_ingredients     String?
+  dinner                String?
+  dinner_ingredients    String?
+  tags                  String?  // JSON or comma separated
+  createdAt             DateTime @default(now())
+}
+
+model GeminiKey {
+  id         String   @id @default(cuid())
+  name       String
+  key        String   // Encrypted
+  isActive   Boolean  @default(true)
+  lastStatus String?  // e.g., "200", "429", "503"
+  lastUsedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+model SavedMealPlan {
+  id        String   @id @default(cuid())
+  planData  String   // JSON stringified MealPlan
+  formData  String   // JSON stringified PlannerFormData
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

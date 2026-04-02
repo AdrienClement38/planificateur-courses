@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { MealPlan, PlannerFormData } from "@/types";
 
 interface ErrorInfo {
@@ -11,7 +11,9 @@ interface ErrorInfo {
 
 interface UseMealPlanReturn {
   plan: MealPlan | null;
+  lastFormData: PlannerFormData | null;
   isLoading: boolean;
+  isInitialLoading: boolean;
   error: ErrorInfo | null;
   generate: (formData: PlannerFormData) => Promise<void>;
   reset: () => void;
@@ -19,13 +21,37 @@ interface UseMealPlanReturn {
 
 export function useMealPlan(): UseMealPlanReturn {
   const [plan, setPlan] = useState<MealPlan | null>(null);
+  const [lastFormData, setLastFormData] = useState<PlannerFormData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [error, setError] = useState<ErrorInfo | null>(null);
+
+  // Load latest plan on mount
+  useEffect(() => {
+    async function loadLatest() {
+      try {
+        const res = await fetch("/api/meal-plan/latest");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.plan) {
+            setPlan(data.plan);
+            setLastFormData(data.formData);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load latest plan:", err);
+      } finally {
+        setIsInitialLoading(false);
+      }
+    }
+    loadLatest();
+  }, []);
 
   const generate = async (formData: PlannerFormData) => {
     setIsLoading(true);
     setError(null);
     setPlan(null);
+    setLastFormData(formData);
 
     try {
       const res = await fetch("/api/generate", {
@@ -47,7 +73,9 @@ export function useMealPlan(): UseMealPlanReturn {
         return;
       }
 
-      setPlan(data.plan);
+      if (data.plan) {
+        setPlan(data.plan);
+      }
     } catch (err) {
       setError({
         message: err instanceof Error ? err.message : "Erreur inconnue"
@@ -57,10 +85,17 @@ export function useMealPlan(): UseMealPlanReturn {
     }
   };
 
-  const reset = () => {
+  const reset = async () => {
     setPlan(null);
+    setLastFormData(null);
     setError(null);
+    // Persistently clear the plan
+    try {
+      await fetch("/api/meal-plan/latest", { method: "DELETE" });
+    } catch (err) {
+      console.error("Failed to clear saved plan:", err);
+    }
   };
 
-  return { plan, isLoading, error, generate, reset };
+  return { plan, lastFormData, isLoading, isInitialLoading, error, generate, reset };
 }

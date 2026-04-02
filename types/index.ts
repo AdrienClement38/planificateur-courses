@@ -29,7 +29,13 @@ export interface PlannerFormData {
 
 export interface Meal {
   day: string;
-  name: string;
+  name?: string;
+  breakfast?: string;
+  breakfast_ingredients?: string[];
+  lunch?: string;
+  lunch_ingredients?: string[];
+  dinner?: string;
+  dinner_ingredients?: string[];
   tags: string[];
 }
 

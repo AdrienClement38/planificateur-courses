@@ -42,43 +42,94 @@ export default async function AdminProductsPage(props: {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
   return (
-    <div className="min-h-screen bg-background p-6 lg:p-12">
-      <div className="mx-auto max-w-6xl space-y-8">
-        <div className="flex items-center gap-4">
-          <Link href="/admin">
-            <Button variant="outline" size="icon">
+    <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
+      <div className="mx-auto max-w-[1400px] flex flex-col lg:flex-row gap-6 lg:gap-10 items-start">
+        
+        {/* SIDEBAR GAUCHE (Desktop) */}
+        <aside className="hidden lg:flex flex-col w-64 shrink-0 sticky top-8 max-h-[calc(100vh-4rem)] overflow-y-auto pr-2 pb-8 custom-scrollbar">
+          <div className="mb-8">
+            <Link href="/admin" className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
               <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div className="flex-1 flex items-center justify-between">
+              Retour Dashboard
+            </Link>
+          </div>
+          
+          <div className="flex flex-col gap-1 border-l border-white/10 pl-4 py-1">
+            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">
+              Sommaire des catégories
+            </div>
+            {Object.keys(groupedProducts).map((category) => {
+              const catId = `category-${category.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`;
+              return (
+                <a 
+                  key={category} 
+                  href={`#${catId}`}
+                  className="block py-1.5 text-sm font-medium text-white/50 hover:text-primary transition-colors"
+                >
+                  {category}
+                </a>
+              );
+            })}
+          </div>
+        </aside>
+
+        {/* CONTENU PRINCIPAL */}
+        <div className="flex-1 min-w-0 w-full mb-32">
+          <div className="flex flex-col lg:flex-row items-start lg:items-end justify-between gap-6 mb-12">
             <div>
-              <h1 className="text-3xl font-black tracking-tight uppercase">Base Produits</h1>
-              <p className="text-muted-foreground flex items-center gap-2">
+              <div className="flex items-center gap-3 lg:hidden mb-4">
+                <Link href="/admin">
+                  <Button variant="outline" size="icon" className="h-9 w-9">
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <div className="text-sm font-medium text-muted-foreground">Retour Dashboard</div>
+              </div>
+              <h1 className="text-3xl sm:text-4xl font-black tracking-tight uppercase">Base Produits</h1>
+              <div className="text-muted-foreground flex items-center gap-2 mt-2">
                 {products.length} produits enregistrés
                 <AutoRefresher />
-              </p>
+              </div>
+              <div className="text-xs text-muted-foreground mt-2 max-w-xl leading-relaxed">
+                Vue d'ensemble par catégorie. <span className="text-destructive/80 font-medium">Un produit est marqué "À vérifier" s'il n'a pas été contrôlé depuis plus de 7 jours.</span>
+              </div>
             </div>
-            <div className="ml-auto flex flex-col-reverse sm:flex-row items-end sm:items-center gap-3">
+            
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
               <ProductSearchInput />
               <AddProductButton />
             </div>
           </div>
-        </div>
 
-        <div className="text-sm text-muted-foreground mb-4">
-          Vue d'ensemble par catégorie. Un produit n'est plus à jour s'il n'a pas été vérifié depuis plus de 7 jours.
-        </div>
+          {/* Raccourcis Mobiles (Horizontaux) */}
+          <div className="lg:hidden flex flex-wrap gap-2 sticky top-4 z-20 bg-background/95 backdrop-blur-md p-3 -mx-4 mb-8 border-b border-t border-white/5 shadow-2xl">
+            {Object.keys(groupedProducts).map((category) => {
+              const catId = `category-${category.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`;
+              return (
+                <a 
+                  key={category} 
+                  href={`#${catId}`}
+                  className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-white/80 transition-all hover:bg-primary/20 hover:text-primary hover:border-primary/30"
+                >
+                  {category}
+                </a>
+              );
+            })}
+          </div>
 
-        {Object.entries(groupedProducts).map(([category, catProducts]: [string, any]) => (
-          <Card key={category} className="border-white/5 bg-white/[0.02]">
-            <CardHeader className="pb-3 border-b border-white/[0.02] bg-white/[0.01]">
-              <CardTitle className="text-lg text-primary flex items-center gap-2">
-                {category}
-                <Badge variant="secondary" className="bg-white/10 text-xs ml-2">
-                  {catProducts.length}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
+          <div className="space-y-12">
+            {Object.entries(groupedProducts).map(([category, catProducts]: [string, any]) => {
+          const catId = `category-${category.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`;
+          return (
+            <Card key={category} id={catId} className="border-white/5 bg-white/[0.02] scroll-mt-24">
+              <CardHeader className="pb-3 border-b border-white/[0.02] bg-white/[0.01]">
+                <CardTitle className="text-lg text-primary flex items-center gap-2">
+                  {category}
+                  <Badge variant="secondary" className="bg-white/10 text-xs ml-2">
+                    {catProducts.length}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
             <CardContent className="p-0 sm:p-6 pt-4 sm:pt-6">
               <div className="rounded-md border border-white/10 sm:overflow-hidden">
                 <div className="overflow-x-auto">
@@ -135,7 +186,10 @@ export default async function AdminProductsPage(props: {
               </div>
             </CardContent>
           </Card>
-        ))}
+          );
+        })}
+          </div>
+        </div>
       </div>
     </div>
   );

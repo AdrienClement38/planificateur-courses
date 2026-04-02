@@ -1,26 +1,37 @@
 "use client";
 
-import { useState } from "react";
 import { PlannerForm } from "@/components/layout/PlannerForm";
 import { PlanResults } from "@/components/layout/PlanResults";
 import { useMealPlan } from "@/hooks/useMealPlan";
 import type { PlannerFormData } from "@/types";
-import { ShoppingCart, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Home() {
-  const { plan, isLoading, error, generate, reset } = useMealPlan();
-  const [lastFormData, setLastFormData] = useState<PlannerFormData | null>(null);
+  const { 
+    plan, 
+    lastFormData, 
+    isLoading, 
+    isInitialLoading, 
+    error, 
+    generate, 
+    reset 
+  } = useMealPlan();
 
   const handleSubmit = async (data: PlannerFormData) => {
-    setLastFormData(data);
     await generate(data);
   };
 
+  if (isInitialLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-border border-t-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background selection:bg-primary/30">
-
-
       <main className="mx-auto max-w-5xl px-6 py-16">
         {!plan && !isLoading && (
           <div className="mb-16 space-y-6">

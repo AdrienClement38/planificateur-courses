@@ -15,7 +15,8 @@ import {
 import { DriveSelector } from "@/components/drive/DriveSelector";
 import { TagInput } from "@/components/drive/TagInput";
 import type { DriveKey, MealType, Period, PlannerFormData } from "@/types";
-import { Loader2, Sparkles, CheckCircle2 } from "lucide-react";
+import { Loader2, Sparkles, CheckCircle2, Star } from "lucide-react";
+import { useEffect } from "react";
 
 const MEAL_TYPE_LABELS: Record<MealType, string> = {
   dinner: "Dîners uniquement",
@@ -44,12 +45,72 @@ export function PlannerForm({ onSubmit, isLoading }: PlannerFormProps) {
   const [preferences, setPreferences] = useState<string[]>([]);
   const [exclusions, setExclusions] = useState<string[]>([]);
   const [zipCode, setZipCode] = useState("");
-  const [stores, setStores] = useState<{name: string; address: string; url: string; id: string}[]>([]);
+  const [stores, setStores] = useState<{ name: string; address: string; url: string; id: string }[]>([]);
   const [isSearchingStores, setIsSearchingStores] = useState(false);
   const [selectedStore, setSelectedStore] = useState("");
   const [selectedStoreUrl, setSelectedStoreUrl] = useState("");
   const [selectedStoreId, setSelectedStoreId] = useState("");
   const [cuisineStyle, setCuisineStyle] = useState("");
+  const [favorites, setFavorites] = useState<{ name: string; address: string; url: string; id: string; drive: DriveKey }[]>([]);
+
+  // Load favorites from API on mount
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      try {
+        const res = await fetch("/api/favorites");
+        if (res.ok) {
+          const data = await res.json();
+          setFavorites(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch favorites from DB:", err);
+        // Fallback to localStorage if API fails
+        const saved = localStorage.getItem("planner-drive-favorites");
+        if (saved) setFavorites(JSON.parse(saved));
+      }
+    };
+    fetchFavorites();
+  }, []);
+
+  // Save to localStorage as a secondary backup
+  useEffect(() => {
+    localStorage.setItem("planner-drive-favorites", JSON.stringify(favorites));
+  }, [favorites]);
+
+  const toggleFavorite = async (e: React.MouseEvent, store: { name: string; address: string; url: string; id: string }) => {
+    e.stopPropagation();
+
+    const isFavorite = favorites.some(f => f.url === store.url);
+
+    // Optimistic Update
+    if (isFavorite) {
+      setFavorites(prev => prev.filter(f => f.url !== store.url));
+    } else {
+      setFavorites(prev => [...prev, { ...store, drive: drive as DriveKey }]);
+    }
+
+    try {
+      const res = await fetch("/api/favorites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...store, drive }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to sync favorite with server");
+      }
+
+      // Refresh to ensure we have the server-side ID/data
+      const refreshedRes = await fetch("/api/favorites");
+      if (refreshedRes.ok) {
+        const data = await refreshedRes.json();
+        setFavorites(data);
+      }
+    } catch (err) {
+      console.error("Sync error:", err);
+      // Revert on error if needed (optional)
+    }
+  };
 
   const handleSearchStores = async () => {
     if (!zipCode || zipCode.length < 5) return;
@@ -98,7 +159,7 @@ export function PlannerForm({ onSubmit, isLoading }: PlannerFormProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           <DriveSelector value={drive} onChange={setDrive} />
-          
+
           <div className="space-y-2">
             <Label htmlFor="zipCode">Code Postal (pour prix locaux)</Label>
             <div className="flex gap-2">
@@ -109,9 +170,9 @@ export function PlannerForm({ onSubmit, isLoading }: PlannerFormProps) {
                 onChange={(e) => setZipCode(e.target.value.replace(/\D/g, "").slice(0, 5))}
                 className="max-w-[120px]"
               />
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={handleSearchStores}
                 disabled={isSearchingStores || zipCode.length < 5}
               >
@@ -120,39 +181,124 @@ export function PlannerForm({ onSubmit, isLoading }: PlannerFormProps) {
             </div>
           </div>
 
-          {stores.length > 0 && (
-            <div className="space-y-2 pt-2">
-              <Label>Sélectionnez votre magasin</Label>
-              <div className="grid gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-                {stores.map((s, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    title={s.url}
-                    onClick={() => {
-                      setSelectedStore(s.name);
-                      setSelectedStoreUrl(s.url);
-                      setSelectedStoreId(s.id);
-                    }}
-                    className={`text-left p-3 rounded-lg border transition-all relative group ${
-                      selectedStore === s.name 
-                        ? "border-primary bg-primary/10 ring-1 ring-primary/20" 
-                        : "border-white/5 bg-white/[0.02] hover:bg-white/[0.05]"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                       <div className="flex-1">
-                          <div className={`font-medium text-sm ${selectedStore === s.name ? "text-primary" : ""}`}>{s.name}</div>
-                          <div className="text-[10px] text-muted-foreground line-clamp-1">{s.address}</div>
-                          <div className="text-[9px] text-muted-foreground/40 mt-1 truncate">🔗 {s.url}</div>
-                       </div>
-                       {selectedStore === s.name && (
-                         <CheckCircle2 className="h-4 w-4 text-primary shrink-0 animate-in zoom-in duration-300" />
-                       )}
-                    </div>
-                  </button>
-                ))}
-              </div>
+          {(favorites.length > 0 || stores.length > 0) && (
+            <div className="space-y-4 pt-2">
+              {favorites.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-[10px] uppercase tracking-wider text-primary/70 font-semibold flex items-center gap-2">
+                    <Star className="h-3 w-3 fill-primary text-primary" />
+                    Drives favoris
+                  </Label>
+                  <div className="grid gap-2 pr-2">
+                    {favorites.map((s, i) => (
+                      <div
+                        key={`fav-${i}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          setDrive(s.drive);
+                          setSelectedStore(s.name);
+                          setSelectedStoreUrl(s.url);
+                          setSelectedStoreId(s.id);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setDrive(s.drive);
+                            setSelectedStore(s.name);
+                            setSelectedStoreUrl(s.url);
+                            setSelectedStoreId(s.id);
+                          }
+                        }}
+                        className={`text-left p-3 rounded-lg border transition-all relative group cursor-pointer ${selectedStoreUrl === s.url
+                          ? "border-primary bg-primary/10 ring-1 ring-primary/20"
+                          : "border-white/5 bg-white/[0.02] hover:bg-white/[0.05]"
+                          }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <div className={`font-medium text-sm ${selectedStoreUrl === s.url ? "text-primary" : ""}`}>{s.name}</div>
+                              <span className="text-[8px] px-1.5 py-0.5 rounded bg-white/10 text-white/50 uppercase">{s.drive}</span>
+                            </div>
+                            <div className="text-[10px] text-muted-foreground line-clamp-1">{s.address}</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/20"
+                              onClick={(e) => toggleFavorite(e, s)}
+                            >
+                              <Star className="h-4 w-4 fill-primary" />
+                            </Button>
+                            {selectedStoreUrl === s.url && (
+                              <CheckCircle2 className="h-4 w-4 text-primary shrink-0 animate-in zoom-in duration-300" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {stores.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Résultats de recherche</Label>
+                  <div className="grid gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                    {stores.map((s, i) => {
+                      const isFav = favorites.some(f => f.url === s.url);
+                      return (
+                        <div
+                          key={i}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            setSelectedStore(s.name);
+                            setSelectedStoreUrl(s.url);
+                            setSelectedStoreId(s.id);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setSelectedStore(s.name);
+                              setSelectedStoreUrl(s.url);
+                              setSelectedStoreId(s.id);
+                            }
+                          }}
+                          className={`text-left p-3 rounded-lg border transition-all relative group cursor-pointer ${selectedStoreUrl === s.url
+                            ? "border-primary bg-primary/10 ring-1 ring-primary/20"
+                            : "border-white/5 bg-white/[0.02] hover:bg-white/[0.05]"
+                            }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1">
+                              <div className={`font-medium text-sm ${selectedStoreUrl === s.url ? "text-primary" : ""}`}>{s.name}</div>
+                              <div className="text-[10px] text-muted-foreground line-clamp-1">{s.address}</div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className={`h-7 w-7 transition-colors ${isFav ? "text-primary hover:bg-primary/20" : "text-muted-foreground/40 hover:text-primary hover:bg-primary/10"}`}
+                                onClick={(e) => toggleFavorite(e, s)}
+                              >
+                                <Star className={`h-4 w-4 ${isFav ? "fill-primary" : ""}`} />
+                              </Button>
+                              {selectedStoreUrl === s.url && (
+                                <CheckCircle2 className="h-4 w-4 text-primary shrink-0 animate-in zoom-in duration-300" />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
