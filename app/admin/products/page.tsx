@@ -2,7 +2,8 @@ import { prisma } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, ArrowLeft } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ExternalLink, ArrowLeft, Ban, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { ProductRowActions } from "@/components/admin/ProductRowActions";
 import { AddProductButton } from "@/components/admin/AddProductButton";
@@ -17,15 +18,20 @@ export default async function AdminProductsPage(props: {
 }) {
   const searchParams = await props.searchParams;
   const q = searchParams?.q || "";
+  const currentTab = searchParams?.tab || "active";
+  const isBannedView = currentTab === "banned";
 
   const products = await prisma.product.findMany({
-    where: q ? {
-      OR: [
-        { name: { contains: q } },
-        { brand: { contains: q } },
-        { category: { contains: q } }
-      ]
-    } : undefined,
+    where: {
+      is_banned: isBannedView,
+      ...(q ? {
+        OR: [
+          { name: { contains: q } },
+          { brand: { contains: q } },
+          { category: { contains: q } }
+        ]
+      } : {})
+    },
     orderBy: [
       { category: 'asc' },
       { name: 'asc' }
@@ -100,6 +106,23 @@ export default async function AdminProductsPage(props: {
               <AddProductButton />
             </div>
           </div>
+
+          <Tabs key={currentTab} defaultValue={currentTab} className="mb-8">
+            <TabsList className="bg-white/5 border border-white/10 p-1">
+              <Link href="?tab=active" scroll={false}>
+                <TabsTrigger value="active" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Produits Actifs
+                </TabsTrigger>
+              </Link>
+              <Link href="?tab=banned" scroll={false}>
+                <TabsTrigger value="banned" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white gap-2">
+                  <Ban className="h-4 w-4" />
+                  Produits Bannis
+                </TabsTrigger>
+              </Link>
+            </TabsList>
+          </Tabs>
 
           {/* Raccourcis Mobiles (Horizontaux) */}
           <div className="lg:hidden flex flex-wrap gap-2 sticky top-4 z-20 bg-background/95 backdrop-blur-md p-3 -mx-4 mb-8 border-b border-t border-white/5 shadow-2xl">

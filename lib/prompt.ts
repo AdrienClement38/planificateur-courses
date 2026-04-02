@@ -7,8 +7,17 @@ const MEAL_TYPE_LABELS: Record<string, string> = {
   all: "petit-déjeuner + déjeuner + dîner",
 };
 
-export function buildMealPlanPrompt(data: PlannerFormData, favorites: any[] = [], favoriteMeals: any[] = []): string {
+export function buildMealPlanPrompt(
+  data: PlannerFormData, 
+  favorites: any[] = [], 
+  favoriteMeals: any[] = [],
+  bannedProducts: any[] = []
+): string {
   const drive = DRIVES[data.drive];
+
+  const bannedPrompt = bannedProducts.length > 0
+    ? `\n\nPRODUITS INTERDITS (LISTE NOIRE) :\nTu as l'INTERDICTION ABSOLUE de proposer les produits ou ingrédients suivants dans les recettes ou la liste de courses. Si une recette classique en contient, trouve une alternative ou propose un autre plat :\n${bannedProducts.map(b => `- ${b.name}`).join("\n")}`
+    : "";
 
   const favoritesPrompt = favorites.length > 0
     ? `\n\nARTICLES OBLIGATOIRES (FAVORIS) :\nTu DOIS IMPÉRATIVEMENT ajouter les produits suivants dans la "shopping_list" finale, peu importe les recettes générées :\n${favorites.map(f => `- ${f.name} (Marque: ${f.brand || "N/A"}, Format: ${f.quantity || "N/A"}, Prix: ${f.price_ttc}€)`).join("\n")}\n\nAssure-toi de les placer dans la bonne catégorie de rayon.`
@@ -45,7 +54,7 @@ export function buildMealPlanPrompt(data: PlannerFormData, favorites: any[] = []
     : "";
 
   return `Tu es un assistant expert en planification de repas.
-Génère un planning COMPLET et une liste de courses pour le drive.${favoritesPrompt}${favoriteMealsPrompt}${concisionWarning}
+Génère un planning COMPLET et une liste de courses pour le drive.${bannedPrompt}${favoritesPrompt}${favoriteMealsPrompt}${concisionWarning}
 
 PARAMÈTRES :
 - Budget: ${data.budget}€ | Personnes: ${data.persons} | Période: ${data.period}

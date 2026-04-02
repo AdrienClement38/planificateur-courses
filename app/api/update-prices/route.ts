@@ -13,9 +13,9 @@ async function updateBatch(batchProducts: any[], sendEvent: any, startCounter: n
   let localCounter = startCounter;
 
   try {
-    const productNames = batchProducts.map(p => p.name);
-    // This call uses the unified scraper in lib/leclerc.ts (Stealth + Headless config)
-    const results = await scrapeLeclercBatch(productNames);
+    const productData = batchProducts.map(p => ({ name: p.name, quantity: p.quantity }));
+    // This call uses the unified scraper in lib/leclerc.ts (Stealth + Headless config + Smart Matching)
+    const results = await scrapeLeclercBatch(productData);
 
     for (const product of batchProducts) {
       localCounter++;

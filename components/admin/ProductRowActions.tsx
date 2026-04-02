@@ -1,25 +1,50 @@
 "use client"
 
 import { useState } from "react";
-import { Pencil, Trash2, X, Loader2 } from "lucide-react";
+import { banProduct, restoreProduct, permanentlyDeleteProduct, updateProduct } from "@/app/admin/products/actions";
+import { RotateCcw, ShieldAlert, Loader2, Pencil, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { deleteProduct, updateProduct } from "@/app/admin/products/actions";
-import { toast } from "sonner";
 
 export function ProductRowActions({ product }: { product: any }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  async function handleDelete() {
-    if (!confirm(`Es-tu sûr de vouloir supprimer "${product.name}" définitivement ?`)) return;
+  async function handleBan() {
+    if (!confirm(`Voulez-vous bannir "${product.name}" ? Il ne sera plus suggéré par l'IA.`)) return;
     setIsDeleting(true);
     try {
-      const res = await deleteProduct(product.id);
+      const res = await banProduct(product.id);
       if (res?.error) throw new Error(res.error);
-      toast.success("Produit supprimé");
+      toast.success("Produit banni et exclu des futurs menus");
+    } catch(err: any) {
+      toast.error(`Erreur : ${err.message}`);
+      setIsDeleting(false);
+    }
+  }
+
+  async function handleRestore() {
+    setIsDeleting(true);
+    try {
+      const res = await restoreProduct(product.id);
+      if (res?.error) throw new Error(res.error);
+      toast.success("Produit restauré");
+    } catch(err: any) {
+      toast.error(`Erreur : ${err.message}`);
+      setIsDeleting(false);
+    }
+  }
+
+  async function handlePermanentDelete() {
+    if (!confirm(`ATTENTION : Voulez-vous supprimer "${product.name}" DÉFINITIVEMENT de la base de données ? Cette action est irréversible.`)) return;
+    setIsDeleting(true);
+    try {
+      const res = await permanentlyDeleteProduct(product.id);
+      if (res?.error) throw new Error(res.error);
+      toast.success("Produit supprimé définitivement");
     } catch(err: any) {
       toast.error(`Erreur : ${err.message}`);
       setIsDeleting(false);
@@ -51,12 +76,25 @@ export function ProductRowActions({ product }: { product: any }) {
 
   return (
     <div className="flex items-center justify-end gap-1">
-      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors" onClick={() => setIsEditing(true)}>
-        <Pencil className="h-4 w-4" />
-      </Button>
-      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive transition-colors" onClick={handleDelete} disabled={isDeleting}>
-        {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-      </Button>
+      {!product.is_banned ? (
+        <>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors" onClick={() => setIsEditing(true)}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" title="Bannir produit" className="h-8 w-8 text-muted-foreground hover:text-orange-500 transition-colors" onClick={handleBan} disabled={isDeleting}>
+            {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldAlert className="h-4 w-4" />}
+          </Button>
+        </>
+      ) : (
+        <>
+          <Button variant="ghost" size="icon" title="Restaurer" className="h-8 w-8 text-muted-foreground hover:text-green-500 transition-colors" onClick={handleRestore} disabled={isDeleting}>
+            {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+          </Button>
+          <Button variant="ghost" size="icon" title="Supprimer définitivement" className="h-8 w-8 text-muted-foreground hover:text-destructive transition-colors" onClick={handlePermanentDelete} disabled={isDeleting}>
+            {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+          </Button>
+        </>
+      )}
 
       {isEditing && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">

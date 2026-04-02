@@ -29,16 +29,17 @@ export async function POST(req: NextRequest) {
     const formData = parsed.data;
     const drive = DRIVES[formData.drive];
 
-    // Fetch all user favorites (products and meals) to influence the AI
-    const [favorites, favoriteMeals] = await Promise.all([
+    // Fetch all user preferences to influence the AI
+    const [favorites, favoriteMeals, bannedProducts] = await Promise.all([
       prisma.product.findMany({ where: { is_favorite: true } }),
-      prisma.favoriteMeal.findMany({ take: 10, orderBy: { createdAt: "desc" } })
+      prisma.favoriteMeal.findMany({ take: 10, orderBy: { createdAt: "desc" } }),
+      prisma.product.findMany({ where: { is_banned: true } })
     ]);
 
     const prompt = buildMealPlanPrompt({
       ...formData,
       zipCode: formData.zipCode || "",
-    }, favorites, favoriteMeals);
+    }, favorites, favoriteMeals, bannedProducts);
 
     const tools: any[] = [
       {

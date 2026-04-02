@@ -12,14 +12,44 @@ async function verifyAuth() {
   await verifyJwtAuth(token);
 }
 
-export async function deleteProduct(id: number) {
+export async function banProduct(id: number) {
+  try {
+    await verifyAuth();
+    await prisma.product.update({ 
+      where: { id: Number(id) },
+      data: { is_banned: true }
+    });
+    revalidatePath("/admin/products");
+    return { success: true };
+  } catch (error: any) {
+    console.error("banProduct Error:", error);
+    return { error: error.message || String(error) };
+  }
+}
+
+export async function restoreProduct(id: number) {
+  try {
+    await verifyAuth();
+    await prisma.product.update({ 
+      where: { id: Number(id) },
+      data: { is_banned: false }
+    });
+    revalidatePath("/admin/products");
+    return { success: true };
+  } catch (error: any) {
+    console.error("restoreProduct Error:", error);
+    return { error: error.message || String(error) };
+  }
+}
+
+export async function permanentlyDeleteProduct(id: number) {
   try {
     await verifyAuth();
     await prisma.product.delete({ where: { id: Number(id) } });
     revalidatePath("/admin/products");
     return { success: true };
   } catch (error: any) {
-    console.error("deleteProduct Error:", error);
+    console.error("permanentlyDeleteProduct Error:", error);
     return { error: error.message || String(error) };
   }
 }

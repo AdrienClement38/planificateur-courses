@@ -43,6 +43,7 @@ next-env.d.ts
 /lib/generated/prisma
 
 # debug and test scripts
+.leclerc_session
 test-*.js
 test-*.ts
 scripts/experiments/
