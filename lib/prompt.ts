@@ -93,8 +93,12 @@ RÈGLES D'OR :
 11. FORMAT : Réponds UNIQUEMENT en JSON compact, SANS retour à la ligne ni markdown \`\`\`json. Pas d'explications après le JSON.
 12. ⚠️ FAVORIS : Inclus tes "REPAS FAVORIS" listés ci-dessus au moins une fois, mais respectant la règle d'anti-répétition ci-dessous.
 13. ⚠️ ANTI-RÉPÉTITION : Ne propose jamais le même plat exact (même nom) plus d'UNE fois par semaine, et pas plus de DEUX fois au total sur tout le planning. Varie les recettes même pour les favoris.
-14. ⚠️ PRÉVENTION DE BOUCLE : Si tu commences à générer une liste répétitive (ex: le même ingrédient encore et encore), ARRÊTE-TOI IMMÉDIATEMENT et passe au repas suivant. NE GÉNÈRE JAMAIS plus de 30000 caractères par réponse totale. ⚠️ LE JSON DOIT ÊTRE COMPLET ET FINIR PAR "}". MÊME SI TU DOIS RÉDUIRE LE CONTENU, NE COUPE JAMAIS AU MILIEU D'UNE PHRASE OU D'UN OBJET. TOUTES LES ACCOLADES ET CROCHETS DOIVENT ÊTRE FERMÉS.
+14. ⚠️ PRÉVENTION DE BOUCLE : Si tu commences à générer une liste répétitive (ex: le même ingrédient encore et encore), ARRÊTE-TOI IMMÉDIATEMENT et passe au repas suivant.
 15. ⚠️ RÉPARTITION DES FAVORIS : Ne concentre JAMAIS les repas favoris sur les premiers jours. Mélange-les avec le reste pour un planning équilibré et imprévisible.
+16. ⚠️ BASE DE DONNÉES GÉNÉRIQUE : Notre base de données contient des produits aux noms SIMPLES et GÉNÉRIQUES (ex: "Lait", "Beurre", "Poulet"). 
+    - Quand tu as besoin d'un ingrédient spécifique (ex: "Lait demi-écrémé Bio"), vérifie d'abord s'il existe une version générique ("Lait") en base. 
+    - Si oui, UTILISE LE PRIX de la version générique. Tu peux garder le nom spécifique dans ta "shopping_list" pour l'utilisateur, mais fais le lien avec le produit générique pour éviter de créer des doublons inutiles en base.
+17. ⚠️ CONCISION EXTRÊME (PLANS LONGS) : Si la période est de 2 semaines ou plus, utilise MAXIMUM UN OU DEUX MOTS pour le nom du repas (ex: "Poulet riz" au lieu de "Filet de poulet au riz basmati et sauce soja").
 
 STRUCTURE JSON (ZÉRO TEXTE HORS DU JSON, finis par }) :
 {

@@ -4,6 +4,7 @@ export interface PricingResult {
   price: number | null;
   source: string;
   matched?: string;
+  link?: string;
 }
 
 export function usePricing() {
@@ -58,7 +59,8 @@ export function usePricing() {
                 next.set(result.item, {
                   price: result.price,
                   source: result.source,
-                  matched: result.matched
+                  matched: result.matched,
+                  link: result.link
                 });
                 return next;
               });

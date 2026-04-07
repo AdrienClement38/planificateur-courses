@@ -1,14 +1,14 @@
-import { PrismaClient } from "@prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-
-const url = "C:/Users/conta/.gemini/antigravity/scratch/planificateur-courses/dev.db";
-const adapter = new PrismaBetterSqlite3({ url });
-const prisma = new PrismaClient({ adapter });
-
+import { prisma } from "../lib/db";
 async function main() {
-  const stores = await prisma.product.findMany({ select: { store_id: true } });
-  const uniqueStores = [...new Set(stores.map(s => s.store_id))];
-  console.log("Unique Store IDs in DB:", uniqueStores);
+  console.log("--- Unique Store IDs ---");
+  const storeIds = await prisma.product.groupBy({
+    by: ['store_id'],
+    _count: {
+        _all: true
+    }
+  });
+  console.log(storeIds);
 }
-
-main().catch(console.error).finally(() => prisma.$disconnect());
+main().catch(console.error).finally(async () => {
+    await prisma.$disconnect();
+});

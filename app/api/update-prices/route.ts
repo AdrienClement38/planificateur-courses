@@ -19,7 +19,8 @@ async function updateBatch(batchProducts: any[], sendEvent: any, startCounter: n
 
     for (const product of batchProducts) {
       localCounter++;
-      const scraped = results[product.name];
+      const resultKey = product.quantity ? `${product.name}|${product.quantity}` : product.name;
+      const scraped = results[resultKey];
       
       let targetPrice = product.price_ttc;
       let sourceTag = "ajax_json";

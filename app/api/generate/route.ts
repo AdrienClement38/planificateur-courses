@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     const [favorites, favoriteMeals, bannedProducts] = await Promise.all([
       prisma.product.findMany({ where: { is_favorite: true } }),
       prisma.favoriteMeal.findMany({ take: 10, orderBy: { createdAt: "desc" } }),
-      prisma.product.findMany({ where: { is_banned: true } })
+      (prisma.product as any).findMany({ where: { is_banned: true } })
     ]);
 
     const prompt = buildMealPlanPrompt({
@@ -70,28 +70,29 @@ export async function POST(req: NextRequest) {
       ];
 
       const mealProperties: any = {
-        day: { type: "STRING" },
-        tags: { type: "ARRAY", items: { type: "STRING" } }
+        day: { type: "STRING", description: "Format: Jour X" },
+        tags: { type: "ARRAY", items: { type: "STRING" }, description: "Max 3 tags courts (ex: eco, rapide)" }
       };
       
       const isLongPeriod = formData.period === "2 weeks" || formData.period === "3 weeks" || formData.period === "1 month";
       const maxIng = isLongPeriod ? 5 : 10;
+      const mealNameDesc = isLongPeriod ? "Nom TRÈS COURT (2-3 mots max, ex: Poulet riz)" : "Nom du plat";
 
       if (formData.mealType === "all") {
-        mealProperties.breakfast = { type: "STRING" };
-        mealProperties.breakfast_ingredients = { type: "ARRAY", items: { type: "STRING" }, maxItems: maxIng };
+        mealProperties.breakfast = { type: "STRING", description: mealNameDesc };
+        mealProperties.breakfast_ingredients = { type: "ARRAY", items: { type: "STRING" }, maxItems: maxIng, description: "Ingrédients essentiels uniquement" };
       }
       if (formData.mealType === "all" || formData.mealType === "lunch-dinner") {
-        mealProperties.lunch = { type: "STRING" };
-        mealProperties.lunch_ingredients = { type: "ARRAY", items: { type: "STRING" }, maxItems: maxIng };
+        mealProperties.lunch = { type: "STRING", description: mealNameDesc };
+        mealProperties.lunch_ingredients = { type: "ARRAY", items: { type: "STRING" }, maxItems: maxIng, description: "Ingrédients essentiels uniquement" };
       }
-      mealProperties.dinner = { type: "STRING" };
-      mealProperties.dinner_ingredients = { type: "ARRAY", items: { type: "STRING" }, maxItems: maxIng };
+      mealProperties.dinner = { type: "STRING", description: mealNameDesc };
+      mealProperties.dinner_ingredients = { type: "ARRAY", items: { type: "STRING" }, maxItems: maxIng, description: "Ingrédients essentiels uniquement" };
 
       const mealPlanResponseSchema = {
         type: "OBJECT",
         properties: {
-          summary: { type: "STRING" },
+          summary: { type: "STRING", description: "Résumé en une phrase courte" },
           estimated_total: { type: "NUMBER" },
           meals: {
             type: "ARRAY",
@@ -106,14 +107,14 @@ export async function POST(req: NextRequest) {
             items: {
               type: "OBJECT",
               properties: {
-                category: { type: "STRING" },
+                category: { type: "STRING", description: "Nom du rayon (ex: Fruits et Légumes)" },
                 items: {
                   type: "ARRAY",
                   items: {
                     type: "OBJECT",
                     properties: {
-                      name: { type: "STRING" },
-                      qty: { type: "STRING" },
+                      name: { type: "STRING", description: "Nom générique (ex: Lait)" },
+                      qty: { type: "STRING", description: "Précisions (ex: Pack x6 - 1L)" },
                       unit_price: { type: "NUMBER" },
                       total_price: { type: "NUMBER" },
                       link: { type: "STRING" }
@@ -127,13 +128,15 @@ export async function POST(req: NextRequest) {
           },
           research_audit: {
             type: "ARRAY",
-            items: { type: "STRING" }
+            items: { type: "STRING" },
+            description: "Preuves de prix trouvés"
           }
         },
         required: ["summary", "estimated_total", "meals", "shopping_list", "research_audit"]
       };
 
-      let geminiResponse = await chatWithGemini(geminiMessages, tools);
+      const preferredModel = isLongPeriod ? "gemini-1.5-pro" : undefined;
+      let geminiResponse = await chatWithGemini(geminiMessages, tools, undefined, preferredModel);
       let toolCallsCount = 0;
 
       while (
@@ -211,14 +214,21 @@ export async function POST(req: NextRequest) {
       }
 
       // --- CONTEXT DISTILLATION FOR FINAL GENERATION ---
-      // Distill search results to save context window and avoid noise
+      // Drastically reduce search results to ONLY what matters (name and price) to save tokens
       const distilledSearchResults: Record<string, any> = {};
       geminiMessages.forEach(msg => {
         if (msg.role === "function") {
           msg.parts.forEach((part: any) => {
             if (part.functionResponse) {
               try {
-                distilledSearchResults[part.functionResponse.name] = JSON.parse(part.functionResponse.response.content);
+                const results = JSON.parse(part.functionResponse.response.content);
+                if (Array.isArray(results)) {
+                  // Only keep the top 2 results per search and only essential fields
+                  distilledSearchResults[part.functionResponse.name] = results.slice(0, 2).map((r: any) => ({
+                    t: r.title,
+                    p: r.price
+                  }));
+                }
               } catch (e) {}
             }
           });
@@ -228,17 +238,37 @@ export async function POST(req: NextRequest) {
       console.log(`[/api/generate] GEMINI: Distilling context for final JSON generation...`);
       const finalPrompt = `Voici les résultats des recherches de prix au drive :\n${JSON.stringify(distilledSearchResults)}\n\nMaintenant, génère le JSON final complet du planning sur ${formData.period} en respectant strictement le budget de ${formData.budget}€ et les favoris.`;
       
-      // Request final response with a clean history and schema enforcement
-      geminiResponse = await chatWithGemini([
-        { role: "user", parts: [{ text: prompt }] },
-        { role: "user", parts: [{ text: finalPrompt }] }
-      ], undefined, mealPlanResponseSchema);
+      // --- ROBUST GENERATION LOOP ---
+      let attempt = 0;
+      const maxAttempts = 2;
+      let modelForAttempt = isLongPeriod ? "gemini-1.5-pro" : undefined;
 
-      const finalContent = geminiResponse.candidates?.[0]?.content?.parts
-        .map((p: any) => p.text || "")
-        .join("");
+      while (attempt < maxAttempts) {
+        attempt++;
+        try {
+          console.log(`[/api/generate] Final Generation Attempt ${attempt}/${maxAttempts} (${modelForAttempt || "Default"})`);
+          const concisionBoost = isLongPeriod ? "SOIS EXTRÊMEMENT CONCIS. UN MOT PAR REPAS MAX DANS 'lunch'/'dinner'. CATEGORIES DE COURSES COMPACTES." : "";
+          
+          const finalResponse = await chatWithGemini([
+            { role: "user", parts: [{ text: prompt }] },
+            { role: "user", parts: [{ text: finalPrompt + "\n" + concisionBoost }] }
+          ], undefined, mealPlanResponseSchema, modelForAttempt);
 
-      return await processResponse(finalContent, "Gemini");
+          const finalContent = finalResponse.candidates?.[0]?.content?.parts
+            .map((p: any) => p.text || "")
+            .join("");
+
+          return await processResponse(finalContent, "Gemini");
+        } catch (error: any) {
+          console.error(`[/api/generate] Final attempt ${attempt} failed:`, error.message);
+          if (attempt < maxAttempts) {
+            console.log("[/api/generate] Escalating to Gemini Pro for retry...");
+            modelForAttempt = "gemini-1.5-pro";
+            continue;
+          }
+          break; // Fall through to Anthropic
+        }
+      }
     }
 
     async function createMessageWithFallback(messages: any[], tools: any[]) {
@@ -369,27 +399,7 @@ export async function POST(req: NextRequest) {
                 return true;
               });
 
-              category.items.forEach((item: any) => {
-                // If link is missing, "N/A", fake, or the dead national search link, use search fallback
-                if (!item.link || item.link.toLowerCase().includes("n/a") || !item.link.startsWith("http") || item.link.includes("leclercdrive.fr/recherche")) {
-                  let fallbackUrl = drive.buildSearchUrl(item.name);
-
-                  // Dynamic Local URL Reconstruction based on user's pattern
-                  if (formData.selectedStoreUrl && formData.selectedStoreUrl.includes("leclercdrive.fr")) {
-                    const urlObj = new URL(formData.selectedStoreUrl);
-                    // If we have an fd-courses or magasin URL, we can reconstruct the local search
-                    if (urlObj.pathname.includes("magasin-")) {
-                      const basePath = urlObj.pathname.replace(".aspx", "");
-                      fallbackUrl = `${urlObj.origin}${basePath}/recherche.aspx?TexteRecherche=${encodeURIComponent(item.name)}`;
-                    } else {
-                      // If we only have the portal URL, drop them at the portal instead of the dead national search
-                      fallbackUrl = formData.selectedStoreUrl;
-                    }
-                  }
-
-                  item.link = fallbackUrl;
-                }
-              });
+              // Systematic reconstruction removed from here, moved to final final step
             }
           });
         }
@@ -407,6 +417,14 @@ export async function POST(req: NextRequest) {
         // --- ZERO ESTIMATION RESOLUTION ---
         console.log(`[/api/generate] Starting post-generation resolution for ${planParsed.data.shopping_list.length} categories...`);
         const resolvedShoppingList = await resolveShoppingListPrices(planParsed.data.shopping_list, formData.drive);
+
+        // --- FINAL LINK RECONSTRUCTION (Scripted, avoids DB / AI noise) ---
+        resolvedShoppingList.forEach((category: any) => {
+          category.items?.forEach((item: any) => {
+             // Systematically rebuild Leclerc links if possible
+             item.link = drive.buildSearchUrl(item.name, formData.selectedStoreUrl);
+          });
+        });
 
         // Recalculate total with real prices
         let newTotal = 0;

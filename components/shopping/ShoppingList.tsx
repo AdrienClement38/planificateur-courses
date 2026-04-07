@@ -2,7 +2,7 @@
 
 import { ExternalLink, Download, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DRIVES } from "@/lib/drives";
+import { DRIVES, repairLeclercUrl } from "@/lib/drives";
 import type { ShoppingList as ShoppingListType, DriveKey } from "@/types";
 import type { PricingResult } from "@/hooks/usePricing";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +42,7 @@ export function ShoppingList({ shoppingList, driveKey, resolvedItems, storeUrl, 
         const resolved = resolvedItems?.get(item.name);
         const price = resolved?.price ?? item.total_price;
         const source = resolved?.source === "db" ? "(Réel)" : "(Est.)";
-        const url = drive.buildSearchUrl(item.name, storeUrl);
+        const url = drive.buildSearchUrl(item.name, storeUrl, storeId);
         text += `• ${item.name} — ${item.qty} — ${price.toFixed(2)}€ ${source} — ${url}\n`;
       }
     }
@@ -153,10 +153,19 @@ export function ShoppingList({ shoppingList, driveKey, resolvedItems, storeUrl, 
 
                     <a
                       href={(() => {
-                        const baseLink = resolved?.link || (item as any).link;
-                        // If link is empty, or just a generic store homepage, use search
-                        const isGeneric = !baseLink || (baseLink.includes(".aspx") && !baseLink.includes("recherche") && !baseLink.includes("produit-"));
-                        return isGeneric ? drive.buildSearchUrl(item.name, storeUrl) : baseLink;
+                        let link = resolved?.link || (item as any).link;
+                        const isGeneric = !link || (link.includes(".aspx") && !link.includes("recherche") && !link.includes("produit-"));
+                        
+                        if (isGeneric) {
+                          link = drive.buildSearchUrl(item.name, storeUrl, storeId);
+                        }
+                        
+                        // Always repair Leclerc links to ensure functional subdomain
+                        if (driveKey === 'leclerc') {
+                          link = repairLeclercUrl(link, storeId);
+                        }
+                        
+                        return link;
                       })()}
                       target="_blank"
                       rel="noopener noreferrer"

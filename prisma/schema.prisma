@@ -23,7 +23,7 @@ model Product {
   is_banned         Boolean  @default(false)      // Articles à ignorer dans les menus
   needs_scraping   Boolean  @default(false)      // Marqueur pour rafraîchir le prix plus tard
 
-  @@unique([name, drive, store_id])
+  @@unique([name, quantity, drive, store_id])
   @@index([name, drive])
 }
 

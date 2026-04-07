@@ -58,16 +58,30 @@ async function simulateHumanScroll(page: any) {
 /**
  * Tries to extract weight/volume from a string (e.g., "250g", "1L", "2x100g")
  */
-function extractQuantityInfo(str: string): { value: number; unit: string } | null {
+/**
+ * Tries to extract weight/volume from a string (e.g., "250g", "1L", "2x100g")
+ * Normalizes to grams (g) or milliliters (ml) for easier comparison.
+ */
+function extractQuantityInfo(str: string): { value: number; unit: string; originalValue: number; originalUnit: string } | null {
     if (!str) return null;
-    const match = str.toLowerCase().replace(/\s/g, "").match(/(\d+x)?(\d+)(g|kg|l|cl|ml|tr|tranches)/);
+    // Handle decimals with . or ,
+    const match = str.toLowerCase().replace(/\s/g, "").replace(",", ".").match(/(\d+x)?(\d+(\.\d+)?)(g|kg|l|cl|ml|tr|tranches)/);
     if (match) {
-        let value = parseFloat(match[2]);
+        let originalValue = parseFloat(match[2]);
         if (match[1]) {
             const multiplier = parseInt(match[1].replace("x", ""));
-            value *= multiplier;
+            originalValue *= multiplier;
         }
-        return { value, unit: match[3] };
+        const originalUnit = match[4];
+        let value = originalValue;
+        let unit = originalUnit;
+
+        // Normalize
+        if (unit === "kg") { value *= 1000; unit = "g"; }
+        else if (unit === "l") { value *= 1000; unit = "ml"; }
+        else if (unit === "cl") { value *= 10; unit = "ml"; }
+
+        return { value, unit, originalValue, originalUnit };
     }
     return null;
 }
@@ -165,6 +179,7 @@ export async function scrapeLeclercBatch(products: { name: string; quantity?: st
     for (let i = 0; i < products.length; i++) {
         const productObj = products[i];
         const query = productObj.name;
+        const resultKey = productObj.quantity ? `${query}|${productObj.quantity}` : query;
         const targetQty = extractQuantityInfo(productObj.quantity || "");
         
         // Hard reset browser every 10 items to prevent DataDome fatigue
@@ -188,7 +203,7 @@ export async function scrapeLeclercBatch(products: { name: string; quantity?: st
             let content = await page.content();
             if (content.includes("Accès temporairement restreint")) {
                 console.error("[/lib/leclerc] HARD BLOCK DETECTED. Aborting batch.");
-                results[query] = { name: query, price: 0, url: htmlUrl, is_blocked: true };
+                results[resultKey] = { name: query, price: 0, url: htmlUrl, is_blocked: true };
                 break;
             }
 
@@ -215,7 +230,7 @@ export async function scrapeLeclercBatch(products: { name: string; quantity?: st
             // 1. Visit HTML page first (sets headers and cookies naturally)
             const responseHtml = await page.goto(htmlUrl, { waitUntil: "networkidle2", timeout: 30000 });
             if (responseHtml?.status() === 403 || (await page.content()).includes("Accès temporairement restreint")) {
-                results[query] = { name: query, price: 0, url: htmlUrl, is_blocked: true };
+                results[resultKey] = { name: query, price: 0, url: htmlUrl, is_blocked: true };
                 continue;
             }
             await randomDelay(1000, 3000);
@@ -230,25 +245,56 @@ export async function scrapeLeclercBatch(products: { name: string; quantity?: st
                 try { 
                     const parsed = JSON.parse(jsonText);
                     const elements = parsed?.lstProduits?.lstElements || [];
-                    let bestMatch = elements[0]?.objElement;
+                    if (elements.length > 0) {
+                        let bestMatch = elements[0].objElement;
+                        let maxScore = -1;
 
-                    if (targetQty && elements.length > 1) {
                         for (const el of elements) {
                             const candidate = el.objElement;
-                            const fullLabel = (candidate.sLibelleLigne1 + " " + (candidate.sLibellePrimes || "")).toLowerCase();
+                            const label1 = (candidate.sLibelleLigne1 || "").toLowerCase();
+                            const label2 = (candidate.sLibelleLigne2 || "").toLowerCase();
+                            const primes = (candidate.sLibellePrimes || "").toLowerCase();
+                            const fullLabel = `${label1} ${label2} ${primes}`;
+                            
                             const candQty = extractQuantityInfo(fullLabel);
-                            if (candQty && candQty.unit === targetQty.unit && candQty.value === targetQty.value) {
+                            
+                            // SCORING SYSTEM
+                            let score = 0;
+                            
+                            // 1. Quantity Match (Higher Priority)
+                            if (targetQty && candQty) {
+                                if (candQty.unit === targetQty.unit && candQty.value === targetQty.value) {
+                                    score += 100; // Perfect Weight Match
+                                } else if (candQty.unit === targetQty.unit) {
+                                    // Same unit but different weight, penalty based on diff
+                                    const diff = Math.abs(candQty.value - targetQty.value);
+                                    score += Math.max(0, 50 - diff / 10);
+                                }
+                            } else if (!targetQty && !candQty) {
+                                score += 20; // Both have no quantity mentioned, assume neutral
+                            }
+                            
+                            // 2. Name Similarity
+                            const normalizedQuery = query.toLowerCase();
+                            if (label1.includes(normalizedQuery)) score += 30;
+                            if (label2.includes(normalizedQuery)) score += 10;
+                            
+                            // 3. Brand preference? No specific instruction but Eco+ is usually at label2 or end of label1
+                            
+                            if (score > maxScore) {
+                                maxScore = score;
                                 bestMatch = candidate;
-                                break;
                             }
                         }
+                        data = bestMatch;
                     }
-                    data = bestMatch; 
-                } catch (e) {}
+                } catch (e) {
+                    console.error("[/lib/leclerc] Error parsing AJAX JSON:", e);
+                }
             }
 
             if (data) {
-                results[query] = {
+                results[resultKey] = {
                     name: decodeHtmlEntities(data.sLibelleLigne1),
                     price: data.nrPVUnitaireTTC,
                     url: htmlUrl,
@@ -270,9 +316,9 @@ export async function scrapeLeclercBatch(products: { name: string; quantity?: st
                 });
 
                 if (scraped && scraped.price > 0) {
-                    results[query] = { name: scraped.name || query, price: scraped.price, url: htmlUrl };
+                    results[resultKey] = { name: scraped.name || query, price: scraped.price, url: htmlUrl };
                 } else if (responseAjax?.status() === 403) {
-                    results[query] = { name: query, price: 0, url: htmlUrl, is_blocked: true };
+                    results[resultKey] = { name: query, price: 0, url: htmlUrl, is_blocked: true };
                 }
             }
         } catch (e) {

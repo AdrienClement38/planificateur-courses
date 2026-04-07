@@ -38,7 +38,8 @@ export async function POST(req: NextRequest) {
                 item,
                 price: result.price_ttc,
                 source: result.source,
-                matched: result.matched_name
+                matched: result.matched_name,
+                link: result.search_url
               });
             } else {
               send({

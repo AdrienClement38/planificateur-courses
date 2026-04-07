@@ -6,7 +6,7 @@ export interface DriveConfig {
   label: string;
   home: string;
   color: string;
-  buildSearchUrl: (query: string, baseUrl?: string) => string;
+  buildSearchUrl: (query: string, baseUrl?: string, storeId?: string) => string;
 }
 
 export type MealType = "dinner" | "lunch-dinner" | "all";

@@ -30,12 +30,14 @@ function normalize(text: string): string {
 export async function findProductPrice(
   productName: string,
   driveKey: string = "leclerc",
-  storeId?: string
-): Promise<{ price_ttc: number; source: string; matched_name: string } | null> {
+  storeId?: string,
+  quantity?: string
+): Promise<{ price_ttc: number; source: string; matched_name: string; search_url: string | null } | null> {
   const normInput = normalize(productName);
   if (!normInput) return null;
   
   const inputWords = normInput.split(" ");
+  const normQuantity = quantity ? normalize(quantity) : null;
 
   // Fetch products for this drive (optionally filtered by store_id)
   const dbProducts = await prisma.product.findMany({
@@ -45,25 +47,38 @@ export async function findProductPrice(
     }
   });
 
-  console.log(`[Pricing] findProductPrice("${productName}", "${driveKey}", "${storeId}") -> dbProducts: ${dbProducts.length}`);
-  if (dbProducts.length > 0) {
-    console.log(`[Pricing] First product in DB: "${dbProducts[0].name}"`);
-  }
+  // Helper to check quantity match
+  const isQuantityMatch = (q1?: string | null, q2?: string | null) => {
+    if (!q1 && !q2) return true;
+    if (!q1 || !q2) return false;
+    return normalize(q1) === normalize(q2);
+  };
 
-  // 1. Try Exact Normalized Match
+  // 1. Try Exact Normalized Match (Name + Quantity)
   const exactMatch = dbProducts.find((p: any) => {
     const dbNorm = normalize(p.name);
-    const isMatch = dbNorm === normInput;
-    if (p.name.includes("œuf")) {
-        console.log(`[Pricing] Exact check: DB="${p.name}" (norm="${dbNorm}") vs Input="${normInput}" -> ${isMatch}`);
-    }
-    return isMatch;
+    const nameMatch = dbNorm === normInput;
+    const qtyMatch = isQuantityMatch(p.quantity, quantity);
+    return nameMatch && qtyMatch;
   });
+  
   if (exactMatch) {
     return {
       price_ttc: exactMatch.price_ttc,
       source: "db",
-      matched_name: exactMatch.name
+      matched_name: exactMatch.name,
+      search_url: exactMatch.search_url
+    };
+  }
+
+  // 1b. Try Exact Name Match (Quantity ignored as fallback)
+  const nameOnlyMatch = dbProducts.find((p: any) => normalize(p.name) === normInput);
+  if (nameOnlyMatch && !quantity) {
+    return {
+      price_ttc: nameOnlyMatch.price_ttc,
+      source: "db",
+      matched_name: nameOnlyMatch.name,
+      search_url: nameOnlyMatch.search_url
     };
   }
 
@@ -82,7 +97,8 @@ export async function findProductPrice(
     return {
       price_ttc: partialMatch.price_ttc,
       source: "db",
-      matched_name: partialMatch.name
+      matched_name: partialMatch.name,
+      search_url: partialMatch.search_url
     };
   }
 
@@ -98,7 +114,8 @@ export async function findProductPrice(
     return {
       price_ttc: reverseMatch.price_ttc,
       source: "db",
-      matched_name: reverseMatch.name
+      matched_name: reverseMatch.name,
+      search_url: reverseMatch.search_url
     };
   }
 

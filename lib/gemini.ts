@@ -45,7 +45,8 @@ async function getAvailableKeys(): Promise<{ id: string | null; key: string }[]>
 
 async function callGeminiWithFallback(
   payload: any,
-  onModelChange?: (model: string) => void
+  onModelChange?: (model: string) => void,
+  preferredModel?: string
 ) {
   const keys = await getAvailableKeys();
   let lastError: any = null;
@@ -54,7 +55,10 @@ async function callGeminiWithFallback(
     throw new Error("Aucune clé API Gemini n'est configurée ou active. Veuillez en ajouter une dans l'administration.");
   }
 
-  for (const model of FALLBACK_MODELS) {
+  // If a preferred model is provided, we try it first, otherwise we use the fallback list
+  const modelsToTry = preferredModel ? [preferredModel, ...FALLBACK_MODELS.filter(m => m !== preferredModel)] : FALLBACK_MODELS;
+
+  for (const model of modelsToTry) {
     if (onModelChange) onModelChange(model);
 
     // Try each key for the current model
@@ -138,7 +142,8 @@ async function callGeminiWithFallback(
 export async function generateWithGemini(
   prompt: string,
   tools?: any[],
-  responseSchema?: any
+  responseSchema?: any,
+  preferredModel?: string
 ) {
   const contents: GeminiMessage[] = [
     {
@@ -185,13 +190,14 @@ export async function generateWithGemini(
     ];
   }
 
-  return callGeminiWithFallback(requestBody);
+  return callGeminiWithFallback(requestBody, undefined, preferredModel);
 }
 
 export async function chatWithGemini(
   messages: GeminiMessage[],
   tools?: any[],
-  responseSchema?: any
+  responseSchema?: any,
+  preferredModel?: string
 ) {
   const safetySettings = [
     { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
@@ -231,5 +237,5 @@ export async function chatWithGemini(
     ];
   }
 
-  return callGeminiWithFallback(requestBody);
+  return callGeminiWithFallback(requestBody, undefined, preferredModel);
 }

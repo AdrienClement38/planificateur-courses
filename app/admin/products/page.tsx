@@ -26,9 +26,9 @@ export default async function AdminProductsPage(props: {
       is_banned: isBannedView,
       ...(q ? {
         OR: [
-          { name: { contains: q } },
-          { brand: { contains: q } },
-          { category: { contains: q } }
+          { name: { contains: q, mode: 'insensitive' } },
+          { brand: { contains: q, mode: 'insensitive' } },
+          { category: { contains: q, mode: 'insensitive' } }
         ]
       } : {})
     },

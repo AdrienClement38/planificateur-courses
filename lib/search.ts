@@ -1,10 +1,24 @@
 import { prisma } from "@/lib/db";
-import { scrapeLeclercProduct, scrapeLeclercBatch } from "@/lib/leclerc";
 import { Prisma } from "@prisma/client";
+import { repairLeclercUrl } from "./drives";
+import { findProductPrice } from "./pricing";
+
+/**
+ * Normalizes a name by removing common specific details (Bio, units, brands) 
+ * to facilitate matching with generic DB entries.
+ */
+function normalizeNameForMatching(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
+    .replace(/\b(bio|organique|nature|frais|surgele|petit|grand|format|lot|x\d+)\b/g, "")
+    .replace(/\d+(g|kg|l|cl|ml|tr|tranches)\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 /**
  * Helper to calculate a safe multiplier from a quantity string.
- * Prevents "720g" from being treated as 720x.
  */
 function getSmartMultiplier(qty: string): number {
   const norm = qty.toLowerCase().trim();
@@ -58,10 +72,14 @@ export async function searchPrices(query: string, driveName: string, driveDomain
   }
 
   // 2. Fuzzy/Broad Match in DB
+  const normalizedQuery = normalizeNameForMatching(query);
+  const queryParts = normalizedQuery.split(" ").filter(p => p.length > 2);
+
   const fuzzyMatch = await prisma.product.findFirst({
     where: { 
       OR: [
-        { name: { contains: query.split(" ")[0] } },
+        { name: { contains: normalizedQuery } },
+        ...queryParts.map(part => ({ name: { contains: part } })),
         { category: { contains: query } }
       ],
       drive: driveName,
@@ -111,20 +129,17 @@ export async function resolveShoppingListPrices(shoppingList: any[], driveName: 
     // CRITICAL FIX: Always ensure total_price starts from a sane multiplier
     const multiplier = getSmartMultiplier(item.qty);
 
-    const dbMatch = await prisma.product.findFirst({
-      where: { name: { contains: item.name }, drive: driveLower },
-      orderBy: { last_updated: "desc" }
-    });
+    const dbMatch = await findProductPrice(item.name, driveLower, undefined, item.qty);
 
     if (dbMatch) {
       item.unit_price = dbMatch.price_ttc;
       item.total_price = item.unit_price * multiplier;
       item.link = dbMatch.search_url || item.link;
-      item.source = "db";
-      item.db_match_name = dbMatch.name;
+      item.source = dbMatch.source;
+      item.db_match_name = dbMatch.matched_name;
     } else {
       // Even if NOT in DB, sanitize the AI's hallucinated total_price
-      item.total_price = item.unit_price * multiplier;
+      item.total_price = (item.unit_price || 3.50) * multiplier;
       missingItemQueries.push(item.name);
     }
   }
@@ -135,14 +150,19 @@ export async function resolveShoppingListPrices(shoppingList: any[], driveName: 
 
     const multiplier = getSmartMultiplier(item.qty);
 
-    // Try a broad DB search for something similar to avoid scraping
+    // Try a broad DB search with normalized name
+    const normalizedItemName = normalizeNameForMatching(item.name);
+    const itemParts = normalizedItemName.split(" ").filter(p => p.length > 2);
+
     const fuzzyMatch = await prisma.product.findFirst({
       where: {
         OR: [
-          { name: { contains: item.name.split(" ")[0] } },
+          { name: { contains: normalizedItemName } },
+          ...itemParts.map(part => ({ name: { contains: part } })),
           { category: { contains: item.category || "" } }
         ],
-        is_banned: false
+        is_banned: false,
+        drive: driveLower
       },
       orderBy: { last_updated: 'desc' }
     });
@@ -161,20 +181,24 @@ export async function resolveShoppingListPrices(shoppingList: any[], driveName: 
     // Flag for later asynchronous scraping in the background (night job)
     try {
       await prisma.product.upsert({
-        where: { name_drive_store_id: { name: item.name, drive: driveLower, store_id: "echirolles-comboire" } },
-        update: { needs_scraping: true },
+        where: { name_quantity_drive_store_id: { name: item.name, quantity: item.qty || "", drive: driveLower, store_id: "echirolles-comboire" } },
+        update: { 
+          needs_scraping: true
+        },
         create: { 
           name: item.name, 
           price_ttc: item.unit_price, 
+          quantity: item.qty || "",
           drive: driveLower, 
           store_id: "echirolles-comboire", 
           category: item.category || "Inconnu", 
           needs_scraping: true,
+          last_updated: new Date(),
           source: "placeholder"
         }
       });
     } catch (e) {
-      console.warn(`[/lib/search] Failed to create placeholder for ${item.name}`);
+      console.warn(`[/lib/search] Failed to create placeholder for ${item.name} (${item.qty})`);
     }
   }
 
@@ -192,5 +216,19 @@ export async function findStores(drive: string, zipCode: string) {
   });
   if (!response.ok) throw new Error(`Serper error: ${response.status}`);
   const data = await response.json();
-  return data.organic?.map((res: any) => ({ name: res.title.split("-")[0].trim(), address: res.snippet || "", url: res.link, id: res.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") })) || [];
+  return data.organic?.map((res: any) => {
+    let url = res.link;
+    // Attempt Leclerc Repair immediately for known patterns
+    // Attempt Leclerc Repair immediately for known patterns
+    if (drive.toLowerCase() === 'leclerc') {
+      url = repairLeclercUrl(url, res.title.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
+    }
+    
+    return { 
+      name: res.title.split("-")[0].trim(), 
+      address: res.snippet || "", 
+      url, 
+      id: res.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") 
+    };
+  }) || [];
 }
